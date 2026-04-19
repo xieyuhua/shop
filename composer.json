@@ -1,0 +1,42 @@
+{
+    "name": "mall/b2b2c",
+    "description": "B2B2C Multi-user Mall System based on ThinkPHP 8.1",
+    "type": "project",
+    "keywords": [
+        "mall",
+        "b2b2c",
+        "thinkphp",
+        "ecommerce"
+    ],
+    "license": "Apache-2.0",
+    "require": {
+        "php": ">=8.1.0",
+        "topthink/framework": "^8.1",
+        "topthink/think-orm": "^3.0",
+        "topthink/think-view": "^2.0",
+        "topthink/think-captcha": "^4.0",
+        "topthink/think-multi-app": "^1.0",
+        "firebase/php-jwt": "^6.10"
+    },
+    "autoload": {
+        "psr-4": {
+            "app\\": "app/"
+        },
+        "files": [
+            "app/common.php"
+        ]
+    },
+    "config": {
+        "preferred-install": "dist",
+        "allow-plugins": {
+            "topthink/think-plugin": true
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "scripts": {
+        "post-autoload-dump": [
+            "@php think clear"
+        ]
+    }
+}

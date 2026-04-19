@@ -1,0 +1,8 @@
+{
+    "name": "topthink/think",
+    "description": "ThinkPHP 8.1 Framework",
+    "type": "project",
+    "require": {
+        "php": ">=8.1.0"
+    }
+}
