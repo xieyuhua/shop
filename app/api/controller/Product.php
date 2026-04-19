@@ -5,159 +5,117 @@ declare(strict_types=1);
 namespace app\api\controller;
 
 use app\common\controller\BaseController;
-use app\common\model\Product;
-use app\common\model\Category;
-use app\common\model\Shop;
-use app\common\model\ProductSku;
-use app\common\model\OrderEvaluate;
+use app\common\entity\ProductEntity;
+use app\common\entity\CategoryEntity;
 
+/**
+ * 商品控制器 - 仅接收参数和返回结果
+ */
 class Product extends BaseController
 {
-    public function list()
+    private ProductEntity $productEntity;
+    private CategoryEntity $categoryEntity;
+
+    public function __construct()
     {
-        $page = $this->request->get('page', 1);
-        $limit = $this->request->get('limit', 15);
-        $categoryId = $this->request->get('category_id', 0);
-        $shopId = $this->request->get('shop_id', 0);
-        $keyword = $this->request->get('keyword', '');
-        $sort = $this->request->get('sort', 'latest');
-        $isNew = $this->request->get('is_new', 0);
-        $isRecommend = $this->request->get('is_recommend', 0);
-
-        $query = Product::with(['shop', 'category'])
-            ->where('is_on_sale', 1)
-            ->where('status', Product::STATUS_PASS);
-
-        if ($categoryId > 0) {
-            $categoryIds = Category::where('pid', $categoryId)->column('id');
-            $categoryIds[] = $categoryId;
-            $query->whereIn('category_id', $categoryIds);
-        }
-
-        if ($shopId > 0) {
-            $query->where('shop_id', $shopId);
-        }
-
-        if ($keyword) {
-            $query->where('name', 'like', '%' . $keyword . '%');
-        }
-
-        if ($isNew) {
-            $query->where('is_new', 1);
-        }
-
-        if ($isRecommend) {
-            $query->where('is_recommend', 1);
-        }
-
-        switch ($sort) {
-            case 'sales':
-                $query->order('sales', 'desc');
-                break;
-            case 'price_asc':
-                $query->order('price', 'asc');
-                break;
-            case 'price_desc':
-                $query->order('price', 'desc');
-                break;
-            case 'latest':
-            default:
-                $query->order('create_time', 'desc');
-                break;
-        }
-
-        $total = $query->count();
-        $list = $query->page($page, $limit)->select();
-
-        return $this->success([
-            'list' => $list,
-            'total' => $total,
-            'page' => $page,
-            'limit' => $limit,
-            'pages' => ceil($total / $limit),
-        ]);
+        parent::__construct();
+        $this->productEntity = new ProductEntity();
+        $this->categoryEntity = new CategoryEntity();
     }
 
-    public function detail()
+    /**
+     * 商品列表
+     */
+    public function list(): \think\Response
     {
-        $id = $this->request->get('id');
+        $params = [
+            'page' => $this->request->get('page', 1),
+            'limit' => $this->request->get('limit', 15),
+            'category_id' => $this->request->get('category_id', 0),
+            'shop_id' => $this->request->get('shop_id', 0),
+            'keyword' => $this->request->get('keyword', ''),
+            'sort' => $this->request->get('sort', 'latest'),
+            'is_new' => $this->request->get('is_new', 0),
+            'is_recommend' => $this->request->get('is_recommend', 0),
+        ];
 
-        $product = Product::with(['shop', 'category', 'specs'])
-            ->where('id', $id)
-            ->where('is_on_sale', 1)
-            ->find();
+        $result = $this->productEntity->getList($params);
+
+        return $this->success($result);
+    }
+
+    /**
+     * 商品详情
+     */
+    public function detail(): \think\Response
+    {
+        $id = (int) $this->request->get('id');
+
+        $product = $this->productEntity->getDetail($id);
 
         if (!$product) {
             return $this->error('商品不存在');
         }
 
-        $product->content = preg_replace('/<img src="\/uploads/', '<img src="' . request()->domain() . '/uploads/', $product->content);
-
-        if ($product->spec_type == Product::SPEC_TYPE_MULTI) {
-            $skus = ProductSku::where('product_id', $id)->select();
-            $product->skus = $skus;
-        }
-
-        $product->evaluate_count = OrderEvaluate::where('product_id', $id)->count();
-        $product->avg_score = OrderEvaluate::where('product_id', $id)->avg('score') ?? 5;
-
         return $this->success($product);
     }
 
-    public function comment()
+    /**
+     * 商品评价
+     */
+    public function comment(): \think\Response
     {
-        $id = $this->request->get('id');
-        $page = $this->request->get('page', 1);
-        $limit = $this->request->get('limit', 15);
+        $id = (int) $this->request->get('id');
+        $page = (int) $this->request->get('page', 1);
+        $limit = (int) $this->request->get('limit', 15);
 
-        $result = OrderEvaluate::getProductEvaluates($id, $page, $limit);
+        $result = $this->productEntity->getComments($id, $page, $limit);
 
         return $this->success($result);
     }
 
-    public function category()
+    /**
+     * 分类列表
+     */
+    public function category(): \think\Response
     {
-        $pid = $this->request->get('pid', 0);
+        $pid = (int) $this->request->get('pid', 0);
 
-        $list = Category::where('pid', $pid)
-            ->where('is_show', 1)
-            ->order('sort', 'asc')
-            ->select();
+        $list = $this->categoryEntity->getList($pid);
 
         return $this->success($list);
     }
 
-    public function categoryTree()
+    /**
+     * 分类树
+     */
+    public function categoryTree(): \think\Response
     {
-        $list = Category::getTree();
+        $list = $this->categoryEntity->getTree();
 
         return $this->success($list);
     }
 
-    public function recommend()
+    /**
+     * 推荐商品
+     */
+    public function recommend(): \think\Response
     {
-        $limit = $this->request->get('limit', 10);
+        $limit = (int) $this->request->get('limit', 10);
 
-        $list = Product::with(['shop'])
-            ->where('is_on_sale', 1)
-            ->where('is_recommend', 1)
-            ->where('status', Product::STATUS_PASS)
-            ->limit($limit)
-            ->select();
+        $list = $this->productEntity->getRecommend($limit);
 
         return $this->success($list);
     }
 
-    public function newArrival()
+    /**
+     * 新品上架
+     */
+    public function newArrival(): \think\Response
     {
-        $limit = $this->request->get('limit', 10);
+        $limit = (int) $this->request->get('limit', 10);
 
-        $list = Product::with(['shop'])
-            ->where('is_on_sale', 1)
-            ->where('is_new', 1)
-            ->where('status', Product::STATUS_PASS)
-            ->limit($limit)
-            ->select();
+        $list = $this->productEntity->getNewArrivals($limit);
 
         return $this->success($list);
     }

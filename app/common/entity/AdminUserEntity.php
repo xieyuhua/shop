@@ -4,137 +4,163 @@ declare(strict_types=1);
 
 namespace app\common\entity;
 
-use app\common\model\Admin as AdminModel;
-use app\common\library\JwtAuth;
+use app\common\model\User as UserModel;
+use app\common\model\BalanceLog;
+use app\common\model\PointsLog;
 
 /**
- * 管理员实体 - 处理管理员相关业务逻辑
+ * 后台用户实体 - 处理后台用户管理业务逻辑
  */
 class AdminUserEntity
 {
     /**
-     * 管理员登录
+     * 获取用户列表
      */
-    public function login(array $data): array
+    public function getList(array $params): array
     {
-        if (empty($data['username']) || empty($data['password'])) {
-            return ['success' => false, 'msg' => '请输入用户名和密码'];
+        $page = max(1, (int) ($params['page'] ?? 1));
+        $limit = min(50, max(1, (int) ($params['limit'] ?? 15)));
+        $keyword = $params['keyword'] ?? '';
+        $status = $params['status'] ?? '';
+
+        $query = UserModel::with(['shop'])->order('id', 'desc');
+
+        // 关键词搜索（防注入）
+        if (!empty($keyword)) {
+            $keyword = addcslashes($keyword, '%_');
+            $query->where(function ($q) use ($keyword) {
+                $q->where('username', 'like', '%' . $keyword . '%')
+                    ->whereOr('nickname', 'like', '%' . $keyword . '%')
+                    ->whereOr('mobile', 'like', '%' . $keyword . '%');
+            });
         }
 
-        $admin = AdminModel::where('username', $data['username'])->find();
-
-        if (!$admin) {
-            return ['success' => false, 'msg' => '管理员不存在'];
+        // 状态筛选
+        if ($status !== '') {
+            $query->where('status', (int) $status);
         }
 
-        if (!password_verify($data['password'], $admin->password)) {
-            return ['success' => false, 'msg' => '密码错误'];
-        }
-
-        if ($admin->status != 1) {
-            return ['success' => false, 'msg' => '账号已被禁用'];
-        }
-
-        // 更新登录信息
-        $admin->last_login_time = time();
-        $admin->last_login_ip = request()->ip();
-        $admin->save();
-
-        $token = JwtAuth::generateAdminToken($admin->id, $admin->role_id);
+        $total = $query->count();
+        $list = $query->page($page, $limit)->select();
 
         return [
-            'success' => true,
-            'data' => [
-                'token' => $token,
-                'admin_id' => $admin->id,
-                'admin_info' => [
-                    'id' => $admin->id,
-                    'username' => $admin->username,
-                    'nickname' => $admin->nickname,
-                    'avatar' => $admin->avatar,
-                    'role_id' => $admin->role_id,
-                ],
-            ],
+            'list' => $list,
+            'total' => $total,
+            'page' => $page,
+            'limit' => $limit,
         ];
     }
 
     /**
-     * 退出登录
+     * 获取用户详情
      */
-    public function logout(string $token): bool
+    public function getDetail(int $id): ?array
     {
-        return true;
+        $user = UserModel::with(['shop', 'addresses'])->find($id);
+        return $user ? $user->toArray() : null;
     }
 
     /**
-     * 获取管理员信息
+     * 设置用户状态
      */
-    public function getInfo(int $adminId): ?array
+    public function setStatus(int $id, int $status): array
     {
-        $admin = AdminModel::find($adminId);
-        if (!$admin) {
-            return null;
-        }
-        return [
-            'id' => $admin->id,
-            'username' => $admin->username,
-            'nickname' => $admin->nickname,
-            'avatar' => $admin->avatar,
-            'role_id' => $admin->role_id,
-        ];
-    }
-
-    /**
-     * 修改密码
-     */
-    public function changePassword(int $adminId, string $oldPassword, string $newPassword): array
-    {
-        if (strlen($newPassword) < 6) {
-            return ['success' => false, 'msg' => '新密码长度不能少于6位'];
+        $user = UserModel::find($id);
+        if (!$user) {
+            return ['success' => false, 'msg' => '用户不存在'];
         }
 
-        $admin = AdminModel::find($adminId);
-        if (!$admin) {
-            return ['success' => false, 'msg' => '管理员不存在'];
-        }
-
-        if (!password_verify($oldPassword, $admin->password)) {
-            return ['success' => false, 'msg' => '原密码错误'];
-        }
-
-        $admin->password = $newPassword;
-        $admin->save();
+        $user->status = $status;
+        $user->save();
 
         return ['success' => true];
     }
 
     /**
-     * 更新管理员信息
+     * 调整用户余额
      */
-    public function updateInfo(int $adminId, array $data): array
+    public function adjustBalance(int $id, float $amount, string $type, string $remark, int $adminId): array
     {
-        $admin = AdminModel::find($adminId);
-        if (!$admin) {
-            return ['success' => false, 'msg' => '管理员不存在'];
+        $user = UserModel::find($id);
+        if (!$user) {
+            return ['success' => false, 'msg' => '用户不存在'];
         }
 
-        if (isset($data['nickname'])) {
-            $admin->nickname = $data['nickname'];
-        }
-        if (isset($data['avatar'])) {
-            $admin->avatar = $data['avatar'];
+        if ($type === 'add') {
+            $user->balance = $user->balance + $amount;
+
+            $log = new BalanceLog();
+            $log->user_id = $id;
+            $log->change_type = BalanceLog::TYPE_INCOME;
+            $log->balance = $amount;
+            $log->description = '管理员调整：' . $remark;
+            $log->source_type = 'admin';
+            $log->source_id = $adminId;
+            $log->create_time = time();
+            $log->save();
+        } else {
+            if ($user->balance < $amount) {
+                return ['success' => false, 'msg' => '余额不足'];
+            }
+            $user->balance = $user->balance - $amount;
+
+            $log = new BalanceLog();
+            $log->user_id = $id;
+            $log->change_type = BalanceLog::TYPE_EXPEND;
+            $log->balance = -$amount;
+            $log->description = '管理员调整：' . $remark;
+            $log->source_type = 'admin';
+            $log->source_id = $adminId;
+            $log->create_time = time();
+            $log->save();
         }
 
-        $admin->save();
+        $user->save();
 
-        return [
-            'success' => true,
-            'data' => [
-                'id' => $admin->id,
-                'username' => $admin->username,
-                'nickname' => $admin->nickname,
-                'avatar' => $admin->avatar,
-            ],
-        ];
+        return ['success' => true, 'data' => ['balance' => $user->balance]];
+    }
+
+    /**
+     * 调整用户积分
+     */
+    public function adjustPoints(int $id, int $points, string $type, string $remark, int $adminId): array
+    {
+        $user = UserModel::find($id);
+        if (!$user) {
+            return ['success' => false, 'msg' => '用户不存在'];
+        }
+
+        if ($type === 'add') {
+            $user->points = $user->points + $points;
+
+            $log = new PointsLog();
+            $log->user_id = $id;
+            $log->change_type = PointsLog::TYPE_INCOME;
+            $log->points = $points;
+            $log->description = '管理员调整：' . $remark;
+            $log->source_type = 'admin';
+            $log->source_id = $adminId;
+            $log->create_time = time();
+            $log->save();
+        } else {
+            if ($user->points < $points) {
+                return ['success' => false, 'msg' => '积分不足'];
+            }
+            $user->points = $user->points - $points;
+
+            $log = new PointsLog();
+            $log->user_id = $id;
+            $log->change_type = PointsLog::TYPE_EXPEND;
+            $log->points = -$points;
+            $log->description = '管理员调整：' . $remark;
+            $log->source_type = 'admin';
+            $log->source_id = $adminId;
+            $log->create_time = time();
+            $log->save();
+        }
+
+        $user->save();
+
+        return ['success' => true, 'data' => ['points' => $user->points]];
     }
 }

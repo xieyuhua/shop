@@ -5,113 +5,111 @@ declare(strict_types=1);
 namespace app\api\controller;
 
 use app\common\controller\BaseController;
-use app\common\model\Coupon;
-use app\common\model\UserCoupon;
+use app\common\entity\CouponEntity;
 
+/**
+ * 优惠券控制器 - 仅接收参数和返回结果
+ */
 class CouponController extends BaseController
 {
-    public function list()
+    private CouponEntity $couponEntity;
+
+    public function __construct()
     {
-        $page = $this->request->get('page', 1);
-        $limit = $this->request->get('limit', 15);
-        $shopId = $this->request->get('shop_id', 0);
-
-        $query = Coupon::where('is_show', 1);
-
-        if ($shopId > 0) {
-            $query->where(function ($q) use ($shopId) {
-                $q->where('shop_id', 0)->whereOr('shop_id', $shopId);
-            });
-        }
-
-        $query->where(function ($q) {
-            $q->where('total_num', 0)->whereOr('send_num', '<', 'total_num');
-        });
-
-        $query->where(function ($q) {
-            $q->where('end_time', 0)->whereOr('end_time', '>', time());
-        });
-
-        $total = $query->count();
-        $list = $query->page($page, $limit)->select();
-
-        return $this->success([
-            'list' => $list,
-            'total' => $total,
-            'page' => $page,
-            'limit' => $limit,
-            'pages' => ceil($total / $limit),
-        ]);
+        parent::__construct();
+        $this->couponEntity = new CouponEntity();
     }
 
-    public function myList()
+    /**
+     * 优惠券列表
+     */
+    public function list(): \think\Response
     {
-        $this->auth();
-        $status = $this->request->get('status', '');
-        $page = $this->request->get('page', 1);
-        $limit = $this->request->get('limit', 15);
+        $params = [
+            'page' => $this->request->get('page', 1),
+            'limit' => $this->request->get('limit', 15),
+            'shop_id' => $this->request->get('shop_id', 0),
+        ];
 
-        $query = UserCoupon::with(['coupon', 'shop'])
-            ->where('user_id', $this->userId);
-
-        if ($status === 'unused') {
-            $query->where('status', UserCoupon::STATUS_UNUSED)
-                ->where('end_time', '>=', time());
-        } elseif ($status === 'used') {
-            $query->where('status', UserCoupon::STATUS_USED);
-        } elseif ($status === 'expired') {
-            $query->where('status', UserCoupon::STATUS_UNUSED)
-                ->where('end_time', '<', time());
-        }
-
-        $total = $query->count();
-        $list = $query->page($page, $limit)->select();
-
-        return $this->success([
-            'list' => $list,
-            'total' => $total,
-            'page' => $page,
-            'limit' => $limit,
-            'pages' => ceil($total / $limit),
-        ]);
-    }
-
-    public function receive()
-    {
-        $this->auth();
-        $couponId = $this->request->post('coupon_id');
-
-        if (empty($couponId)) {
-            return $this->error('请选择优惠券');
-        }
-
-        $coupon = Coupon::find($couponId);
-        if (!$coupon) {
-            return $this->error('优惠券不存在');
-        }
-
-        if ($coupon->send_type != Coupon::SEND_TYPE_PUBLISH) {
-            return $this->error('该优惠券不支持领取');
-        }
-
-        $result = Coupon::receive($couponId, $this->userId);
-        if (!$result) {
-            return $this->error('领取失败，请检查是否已领取或优惠券已发完');
-        }
+        $result = $this->couponEntity->getList($params);
 
         return $this->success($result);
     }
 
-    public function available()
+    /**
+     * 我的优惠券
+     */
+    public function myList(): \think\Response
     {
         $this->auth();
-        $money = $this->request->get('money', 0);
-        $shopId = $this->request->get('shop_id', 0);
-        $categoryId = $this->request->get('category_id', 0);
-        $productId = $this->request->get('product_id', 0);
 
-        $coupons = UserCoupon::getAvailableCoupons($this->userId, $money, $shopId, $categoryId, $productId);
+        $params = [
+            'page' => $this->request->get('page', 1),
+            'limit' => $this->request->get('limit', 15),
+            'status' => $this->request->get('status', ''),
+        ];
+
+        $result = $this->couponEntity->getMyList($this->userId, $params);
+
+        return $this->success($result);
+    }
+
+    /**
+     * 领取优惠券
+     */
+    public function receive(): \think\Response
+    {
+        $this->auth();
+
+        $couponId = (int) $this->request->post('coupon_id');
+
+        $result = $this->couponEntity->receive($this->userId, $couponId);
+
+        if (!$result['success']) {
+            return $this->error($result['msg']);
+        }
+
+        return $this->success($result['data'] ?? []);
+    }
+
+    /**
+     * 可用优惠券
+     */
+    public function available(): \think\Response
+    {
+        $this->auth();
+
+        $params = [
+            'money' => (float) $this->request->get('money', 0),
+            'shop_id' => (int) $this->request->get('shop_id', 0),
+            'category_id' => (int) $this->request->get('category_id', 0),
+            'product_id' => (int) $this->request->get('product_id', 0),
+        ];
+
+        $coupons = $this->couponEntity->getAvailable(
+            $this->userId,
+            $params['money'],
+            $params['shop_id'],
+            $params['category_id'],
+            $params['product_id']
+        );
 
         return $this->success($coupons);
+    }
+
+    /**
+     * 优惠券详情
+     */
+    public function detail(): \think\Response
+    {
+        $id = (int) $this->request->get('id');
+
+        $coupon = $this->couponEntity->getDetail($id);
+
+        if (!$coupon) {
+            return $this->error('优惠券不存在');
+        }
+
+        return $this->success($coupon);
     }
 }

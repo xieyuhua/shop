@@ -4,13 +4,22 @@ declare(strict_types=1);
 
 namespace app\admin\controller;
 
-use app\common\model\Shop as ShopModel;
+use app\common\controller\BaseController;
+use app\common\entity\ShopEntity;
 
 /**
  * 后台店铺管理控制器 - 仅接收参数和返回结果
  */
 class Shop extends BaseController
 {
+    private ShopEntity $shopEntity;
+
+    public function __construct()
+    {
+        parent::__construct();
+        $this->shopEntity = new ShopEntity();
+    }
+
     /**
      * 店铺列表
      */
@@ -18,30 +27,16 @@ class Shop extends BaseController
     {
         $this->adminAuth();
 
-        $page = (int) $this->request->get('page', 1);
-        $limit = (int) $this->request->get('limit', 15);
-        $keyword = $this->request->get('keyword', '');
-        $status = $this->request->get('status', '');
+        $params = [
+            'page' => $this->request->get('page', 1),
+            'limit' => $this->request->get('limit', 15),
+            'keyword' => $this->request->get('keyword', ''),
+            'status' => $this->request->get('status', ''),
+        ];
 
-        $query = ShopModel::with(['user', 'category'])->order('id', 'desc');
+        $result = $this->shopEntity->getList($params);
 
-        if (!empty($keyword)) {
-            $query->where('shop_name', 'like', '%' . $keyword . '%');
-        }
-
-        if ($status !== '') {
-            $query->where('status', (int) $status);
-        }
-
-        $total = $query->count();
-        $list = $query->page($page, $limit)->select();
-
-        return $this->success([
-            'list' => $list,
-            'total' => $total,
-            'page' => $page,
-            'limit' => $limit,
-        ]);
+        return $this->success($result);
     }
 
     /**
@@ -53,7 +48,7 @@ class Shop extends BaseController
 
         $id = (int) $this->request->get('id', 0);
 
-        $shop = ShopModel::with(['user', 'category'])->find($id);
+        $shop = $this->shopEntity->getDetail($id);
 
         if (!$shop) {
             return $this->error('店铺不存在');
@@ -73,22 +68,11 @@ class Shop extends BaseController
         $status = (int) $this->request->post('status', 1);
         $reason = $this->request->post('reason', '');
 
-        $shop = ShopModel::find($id);
+        $result = $this->shopEntity->audit($id, $status, $reason);
 
-        if (!$shop) {
-            return $this->error('店铺不存在');
+        if (!$result['success']) {
+            return $this->error($result['msg']);
         }
-
-        if ($shop->status != ShopModel::STATUS_PENDING) {
-            return $this->error('店铺状态不允许审核');
-        }
-
-        $shop->status = $status;
-        if ($status == ShopModel::STATUS_REJECTED) {
-            $shop->reject_reason = $reason;
-        }
-        $shop->audit_time = time();
-        $shop->save();
 
         return $this->success();
     }
@@ -103,14 +87,11 @@ class Shop extends BaseController
         $id = (int) $this->request->post('id', 0);
         $status = (int) $this->request->post('status', 1);
 
-        $shop = ShopModel::find($id);
+        $result = $this->shopEntity->setStatus($id, $status);
 
-        if (!$shop) {
-            return $this->error('店铺不存在');
+        if (!$result['success']) {
+            return $this->error($result['msg']);
         }
-
-        $shop->status = $status;
-        $shop->save();
 
         return $this->success();
     }

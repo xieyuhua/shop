@@ -6,6 +6,8 @@ namespace app\api\controller;
 
 use app\common\controller\BaseController;
 use app\common\entity\UserEntity;
+use app\common\entity\OrderEntity;
+use app\common\entity\UserLogEntity;
 
 /**
  * 用户控制器 - 仅接收参数和返回结果
@@ -13,11 +15,15 @@ use app\common\entity\UserEntity;
 class User extends BaseController
 {
     private UserEntity $userEntity;
+    private OrderEntity $orderEntity;
+    private UserLogEntity $userLogEntity;
 
     public function __construct()
     {
         parent::__construct();
         $this->userEntity = new UserEntity();
+        $this->orderEntity = new OrderEntity();
+        $this->userLogEntity = new UserLogEntity();
     }
 
     /**
@@ -34,9 +40,7 @@ class User extends BaseController
         }
 
         // 获取订单统计
-        $orderEntity = new \app\common\entity\OrderEntity();
-        $orderCount = $orderEntity->getCount($this->userId);
-
+        $orderCount = $this->orderEntity->getCount($this->userId);
         $userInfo['order_count'] = $orderCount['data'] ?? [];
 
         return $this->success($userInfo);
@@ -108,20 +112,9 @@ class User extends BaseController
         $page = (int) $this->request->get('page', 1);
         $limit = (int) $this->request->get('limit', 15);
 
-        $logs = \app\common\model\BalanceLog::where('user_id', $this->userId)
-            ->order('id', 'desc')
-            ->page($page, $limit)
-            ->select();
+        $result = $this->userLogEntity->getBalanceLogs($this->userId, $page, $limit);
 
-        $total = \app\common\model\BalanceLog::where('user_id', $this->userId)->count();
-
-        return $this->success([
-            'list' => $logs,
-            'total' => $total,
-            'page' => $page,
-            'limit' => $limit,
-            'pages' => ceil($total / $limit),
-        ]);
+        return $this->success($result);
     }
 
     /**
@@ -134,19 +127,8 @@ class User extends BaseController
         $page = (int) $this->request->get('page', 1);
         $limit = (int) $this->request->get('limit', 15);
 
-        $logs = \app\common\model\PointsLog::where('user_id', $this->userId)
-            ->order('id', 'desc')
-            ->page($page, $limit)
-            ->select();
+        $result = $this->userLogEntity->getPointsLogs($this->userId, $page, $limit);
 
-        $total = \app\common\model\PointsLog::where('user_id', $this->userId)->count();
-
-        return $this->success([
-            'list' => $logs,
-            'total' => $total,
-            'page' => $page,
-            'limit' => $limit,
-            'pages' => ceil($total / $limit),
-        ]);
+        return $this->success($result);
     }
 }

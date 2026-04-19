@@ -11,109 +11,67 @@ use app\common\model\Shop as ShopModel;
  */
 class ShopEntity
 {
-    /**
-     * 申请入驻
-     */
-    public function apply(int $userId, array $data): array
+    private ShopModel $model;
+
+    public function __construct()
     {
-        // 检查是否已有店铺
-        $existing = ShopModel::where('user_id', $userId)->find();
-        if ($existing) {
-            return ['success' => false, 'msg' => '您已申请过店铺'];
+        $this->model = new ShopModel();
+    }
+
+    /**
+     * 获取店铺列表
+     */
+    public function getList(array $params): array
+    {
+        $page = max(1, (int) ($params['page'] ?? 1));
+        $limit = min(50, max(1, (int) ($params['limit'] ?? 15)));
+        $keyword = $params['keyword'] ?? '';
+        $status = $params['status'] ?? '';
+
+        $query = ShopModel::with(['user', 'category'])->order('id', 'desc');
+
+        // 关键词搜索（防注入）
+        if (!empty($keyword)) {
+            $keyword = addcslashes($keyword, '%_');
+            $query->where('shop_name', 'like', '%' . $keyword . '%');
         }
 
-        $errors = $this->validateApply($data);
-        if (!empty($errors)) {
-            return ['success' => false, 'errors' => $errors];
+        // 状态筛选
+        if ($status !== '') {
+            $query->where('status', (int) $status);
         }
 
-        $shop = new ShopModel();
-        $shop->user_id = $userId;
-        $shop->shop_name = $data['shop_name'];
-        $shop->shop_desc = $data['shop_desc'] ?? '';
-        $shop->shop_logo = $data['shop_logo'] ?? '';
-        $shop->contact_name = $data['contact_name'];
-        $shop->contact_mobile = $data['contact_mobile'];
-        $shop->category_id = $data['category_id'] ?? 0;
-        $shop->status = ShopModel::STATUS_PENDING;
-        $shop->save();
+        $total = $query->count();
+        $list = $query->page($page, $limit)->select();
 
         return [
-            'success' => true,
-            'data' => [
-                'shop_id' => $shop->id,
-                'status' => $shop->status,
-            ],
+            'list' => $list,
+            'total' => $total,
+            'page' => $page,
+            'limit' => $limit,
         ];
     }
 
     /**
-     * 获取店铺信息
+     * 获取店铺详情
      */
-    public function getInfo(int $shopId): ?array
+    public function getDetail(int $id): ?array
     {
-        $shop = ShopModel::find($shopId);
-        if (!$shop) {
-            return null;
-        }
-        return $this->formatShopInfo($shop);
+        $shop = ShopModel::with(['user', 'category'])->find($id);
+        return $shop ? $shop->toArray() : null;
     }
 
     /**
-     * 获取用户的店铺
+     * 审核店铺
      */
-    public function getUserShop(int $userId): ?array
+    public function audit(int $id, int $status, string $reason = ''): array
     {
-        $shop = ShopModel::where('user_id', $userId)->find();
-        if (!$shop) {
-            return null;
-        }
-        return $this->formatShopInfo($shop);
-    }
-
-    /**
-     * 更新店铺信息
-     */
-    public function update(int $shopId, int $userId, array $data): array
-    {
-        $shop = ShopModel::where('id', $shopId)
-            ->where('user_id', $userId)
-            ->find();
-
-        if (!$shop) {
-            return ['success' => false, 'msg' => '店铺不存在'];
+        // 参数校验
+        if (!in_array($status, [ShopModel::STATUS_PASS, ShopModel::STATUS_REJECTED])) {
+            return ['success' => false, 'msg' => '审核状态不正确'];
         }
 
-        if (isset($data['shop_name'])) {
-            $shop->shop_name = $data['shop_name'];
-        }
-        if (isset($data['shop_desc'])) {
-            $shop->shop_desc = $data['shop_desc'];
-        }
-        if (isset($data['shop_logo'])) {
-            $shop->shop_logo = $data['shop_logo'];
-        }
-        if (isset($data['contact_name'])) {
-            $shop->contact_name = $data['contact_name'];
-        }
-        if (isset($data['contact_mobile'])) {
-            $shop->contact_mobile = $data['contact_mobile'];
-        }
-
-        $shop->save();
-
-        return [
-            'success' => true,
-            'data' => $this->formatShopInfo($shop),
-        ];
-    }
-
-    /**
-     * 审核店铺（后台）
-     */
-    public function audit(int $shopId, int $status, string $reason = ''): array
-    {
-        $shop = ShopModel::find($shopId);
+        $shop = ShopModel::find($id);
         if (!$shop) {
             return ['success' => false, 'msg' => '店铺不存在'];
         }
@@ -133,82 +91,37 @@ class ShopEntity
     }
 
     /**
-     * 获取店铺列表
+     * 设置店铺状态
      */
-    public function getList(array $filters = [], int $page = 1, int $limit = 15): array
+    public function setStatus(int $id, int $status): array
     {
-        $query = ShopModel::with(['user', 'category'])
-            ->order('id', 'desc');
-
-        if (isset($filters['status']) && $filters['status'] !== '') {
-            $query->where('status', $filters['status']);
+        $shop = ShopModel::find($id);
+        if (!$shop) {
+            return ['success' => false, 'msg' => '店铺不存在'];
         }
 
-        if (!empty($filters['shop_name'])) {
-            $query->where('shop_name', 'like', '%' . $filters['shop_name'] . '%');
-        }
+        $shop->status = $status;
+        $shop->save();
 
-        $total = $query->count();
-        $list = $query->page($page, $limit)->select();
-
-        $data = [];
-        foreach ($list as $shop) {
-            $data[] = $this->formatShopInfo($shop);
-        }
-
-        return [
-            'success' => true,
-            'data' => [
-                'list' => $data,
-                'total' => $total,
-                'page' => $page,
-                'limit' => $limit,
-                'pages' => ceil($total / $limit),
-            ],
-        ];
+        return ['success' => true];
     }
 
     /**
-     * 验证入驻申请
+     * 获取店铺统计
      */
-    private function validateApply(array $data): array
+    public function getStats(int $shopId): array
     {
-        $errors = [];
-
-        if (empty($data['shop_name'])) {
-            $errors['shop_name'] = '请输入店铺名称';
+        $shop = ShopModel::find($shopId);
+        if (!$shop) {
+            return [];
         }
 
-        if (empty($data['contact_name'])) {
-            $errors['contact_name'] = '请输入联系人姓名';
-        }
+        $orderCount = \app\common\model\Order::where('shop_id', $shopId)->count();
+        $productCount = \app\common\model\Product::where('shop_id', $shopId)->where('is_on_sale', 1)->count();
 
-        if (empty($data['contact_mobile'])) {
-            $errors['contact_mobile'] = '请输入联系电话';
-        } elseif (!preg_match('/^1[3-9]\d{9}$/', $data['contact_mobile'])) {
-            $errors['contact_mobile'] = '手机号格式不正确';
-        }
-
-        return $errors;
-    }
-
-    /**
-     * 格式化店铺信息
-     */
-    private function formatShopInfo(ShopModel $shop): array
-    {
         return [
-            'id' => $shop->id,
-            'user_id' => $shop->user_id,
-            'shop_name' => $shop->shop_name,
-            'shop_desc' => $shop->shop_desc,
-            'shop_logo' => $shop->shop_logo,
-            'contact_name' => $shop->contact_name,
-            'contact_mobile' => $shop->contact_mobile,
-            'category_id' => $shop->category_id,
-            'status' => $shop->status,
-            'status_text' => $shop->status_text,
-            'create_time' => $shop->create_time,
+            'order_count' => $orderCount,
+            'product_count' => $productCount,
         ];
     }
 }
