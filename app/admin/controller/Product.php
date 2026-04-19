@@ -5,57 +5,53 @@ declare(strict_types=1);
 namespace app\admin\controller;
 
 use app\common\controller\BaseController;
-use app\common\model\Product;
-use app\common\model\ProductSku;
-use app\common\model\ProductSpec;
+use app\common\entity\AdminProductEntity;
 
+/**
+ * 后台商品管理控制器 - 仅接收参数和返回结果
+ */
 class ProductController extends BaseController
 {
-    public function list()
+    private AdminProductEntity $productEntity;
+
+    public function __construct()
     {
-        $this->adminAuth();
-        $page = $this->request->get('page', 1);
-        $limit = $this->request->get('limit', 15);
-        $keyword = $this->request->get('keyword', '');
-        $categoryId = $this->request->get('category_id', 0);
-        $shopId = $this->request->get('shop_id', 0);
-        $status = $this->request->get('status', '');
-
-        $query = Product::with(['shop', 'category']);
-
-        if ($keyword) {
-            $query = $query->where('name', 'like', '%' . $keyword . '%');
-        }
-
-        if ($categoryId > 0) {
-            $query = $query->where('category_id', $categoryId);
-        }
-
-        if ($shopId > 0) {
-            $query = $query->where('shop_id', $shopId);
-        }
-
-        if ($status !== '') {
-            $query = $query->where('status', $status);
-        }
-
-        $total = $query->count();
-        $list = $query->order('create_time', 'desc')->page($page, $limit)->select();
-
-        return $this->success([
-            'list' => $list,
-            'total' => $total,
-            'page' => $page,
-            'limit' => $limit,
-        ]);
+        parent::__construct();
+        $this->productEntity = new AdminProductEntity();
     }
 
-    public function detail()
+    /**
+     * 商品列表
+     */
+    public function list(): \think\Response
     {
         $this->adminAuth();
-        $id = $this->request->get('id');
 
-        $product = Product::with(['shop', 'category', 'specs', 'skus'])->find($id);
+        $params = [
+            'page' => $this->request->get('page', 1),
+            'limit' => $this->request->get('limit', 15),
+            'keyword' => $this->request->get('keyword', ''),
+            'category_id' => $this->request->get('category_id', 0),
+            'shop_id' => $this->request->get('shop_id', 0),
+            'status' => $this->request->get('status', ''),
+        ];
+
+        $result = $this->productEntity->getList($params);
+
+        return $this->success($result);
+    }
+
+    /**
+     * 商品详情
+     */
+    public function detail(): \think\Response
+    {
+        $this->adminAuth();
+
+        $id = (int) $this->request->get('id', 0);
+
+        $product = $this->productEntity->getDetail($id);
+
         if (!$product) {
             return $this->error('商品不存在');
         }
@@ -63,158 +59,94 @@ class ProductController extends BaseController
         return $this->success($product);
     }
 
-    public function create()
+    /**
+     * 创建商品
+     */
+    public function create(): \think\Response
     {
         $this->adminAuth();
+
+        $adminId = $this->adminId;
         $data = $this->request->post();
 
-        if (empty($data['shop_id'])) {
-            return $this->error('请选择店铺');
-        }
-        if (empty($data['category_id'])) {
-            return $this->error('请选择分类');
-        }
-        if (empty($data['name'])) {
-            return $this->error('请输入商品名称');
-        }
-        if (!isset($data['price']) || $data['price'] <= 0) {
-            return $this->error('请输入商品价格');
+        $result = $this->productEntity->create($adminId, $data);
+
+        if (!$result['success']) {
+            return $this->error($result['msg']);
         }
 
-        $product = Product::createProduct($data['shop_id'], $data);
-
-        if (!empty($data['specs'])) {
-            foreach ($data['specs'] as $spec) {
-                $productSpec = new ProductSpec();
-                $productSpec->product_id = $product->id;
-                $productSpec->name = $spec['name'];
-                $productSpec->values = $spec['values'];
-                $productSpec->sort = $spec['sort'] ?? 100;
-                $productSpec->save();
-            }
-        }
-
-        if (!empty($data['skus'])) {
-            foreach ($data['skus'] as $sku) {
-                $productSku = new ProductSku();
-                $productSku->product_id = $product->id;
-                $productSku->sku_name = $sku['sku_name'];
-                $productSku->sku_code = $sku['sku_code'] ?? '';
-                $productSku->price = $sku['price'];
-                $productSku->original_price = $sku['original_price'] ?? 0;
-                $productSku->cost_price = $sku['cost_price'] ?? 0;
-                $productSku->stock = $sku['stock'] ?? 0;
-                $productSku->weight = $sku['weight'] ?? 0;
-                $productSku->image = $sku['image'] ?? '';
-                $productSku->specs = $sku['specs'] ?? [];
-                $productSku->save();
-            }
-        }
-
-        return $this->success($product);
+        return $this->success($result['data']);
     }
 
-    public function update()
+    /**
+     * 更新商品
+     */
+    public function update(): \think\Response
     {
         $this->adminAuth();
+
         $data = $this->request->post();
 
-        $product = Product::find($data['id']);
-        if (!$product) {
-            return $this->error('商品不存在');
+        $result = $this->productEntity->update($data);
+
+        if (!$result['success']) {
+            return $this->error($result['msg']);
         }
 
-        $product->category_id = $data['category_id'] ?? $product->category_id;
-        $product->name = $data['name'] ?? $product->name;
-        $product->subtitle = $data['subtitle'] ?? $product->subtitle;
-        $product->image = $data['image'] ?? $product->image;
-        $product->images = $data['images'] ?? $product->images;
-        $product->price = $data['price'] ?? $product->price;
-        $product->original_price = $data['original_price'] ?? $product->original_price;
-        $product->cost_price = $data['cost_price'] ?? $product->cost_price;
-        $product->stock = $data['stock'] ?? $product->stock;
-        $product->weight = $data['weight'] ?? $product->weight;
-        $product->unit = $data['unit'] ?? $product->unit;
-        $product->content = $data['content'] ?? $product->content;
-        $product->is_on_sale = $data['is_on_sale'] ?? $product->is_on_sale;
-        $product->is_recommend = $data['is_recommend'] ?? $product->is_recommend;
-        $product->is_new = $data['is_new'] ?? $product->is_new;
-        $product->freight_type = $data['freight_type'] ?? $product->freight_type;
-        $product->freight_money = $data['freight_money'] ?? $product->freight_money;
-        $product->save();
-
-        return $this->success($product);
+        return $this->success($result['data']);
     }
 
-    public function delete()
+    /**
+     * 删除商品
+     */
+    public function delete(): \think\Response
     {
         $this->adminAuth();
-        $id = $this->request->post('id');
 
-        $product = Product::find($id);
-        if (!$product) {
-            return $this->error('商品不存在');
+        $id = (int) $this->request->post('id', 0);
+
+        $result = $this->productEntity->delete($id);
+
+        if (!$result['success']) {
+            return $this->error($result['msg']);
         }
-
-        if ($product->sales > 0) {
-            return $this->error('该商品有销售记录，无法删除');
-        }
-
-        ProductSku::where('product_id', $id)->delete();
-        ProductSpec::where('product_id', $id)->delete();
-        $product->delete();
 
         return $this->success();
     }
 
-    public function audit()
+    /**
+     * 审核商品
+     */
+    public function audit(): \think\Response
     {
         $this->adminAuth();
-        $data = $this->request->post();
 
-        $product = Product::find($data['id']);
-        if (!$product) {
-            return $this->error('商品不存在');
+        $id = (int) $this->request->post('id', 0);
+        $status = (int) $this->request->post('status', 1);
+
+        $result = $this->productEntity->audit($id, $status);
+
+        if (!$result['success']) {
+            return $this->error($result['msg']);
         }
-
-        if ($product->status != Product::STATUS_PENDING) {
-            return $this->error('商品状态不允许审核');
-        }
-
-        if ($data['status'] == Product::STATUS_PASS) {
-            $product->status = Product::STATUS_PASS;
-        } else {
-            $product->status = Product::STATUS_REJECT;
-        }
-
-        $product->save();
 
         return $this->success();
     }
 
-    public function batchUpdate()
+    /**
+     * 批量更新
+     */
+    public function batchUpdate(): \think\Response
     {
         $this->adminAuth();
-        $data = $this->request->post();
 
+        $data = $this->request->post();
         $ids = $data['ids'] ?? [];
-        if (empty($ids)) {
-            return $this->error('请选择商品');
-        }
 
-        $updateData = [];
-        if (isset($data['is_on_sale'])) {
-            $updateData['is_on_sale'] = $data['is_on_sale'];
-        }
-        if (isset($data['is_recommend'])) {
-            $updateData['is_recommend'] = $data['is_recommend'];
-        }
-        if (isset($data['is_new'])) {
-            $updateData['is_new'] = $data['is_new'];
-        }
+        $result = $this->productEntity->batchUpdate($ids, $data);
 
-        if (!empty($updateData)) {
-            Product::whereIn('id', $ids)->update($updateData);
+        if (!$result['success']) {
+            return $this->error($result['msg']);
         }
 
         return $this->success();

@@ -5,43 +5,68 @@ declare(strict_types=1);
 namespace app\admin\controller;
 
 use app\common\controller\BaseController;
-use app\common\model\Category;
+use app\common\entity\AdminCategoryEntity;
 
+/**
+ * 后台分类管理控制器 - 仅接收参数和返回结果
+ */
 class CategoryController extends BaseController
 {
-    public function list()
+    private AdminCategoryEntity $categoryEntity;
+
+    public function __construct()
+    {
+        parent::__construct();
+        $this->categoryEntity = new AdminCategoryEntity();
+    }
+
+    /**
+     * 分类列表
+     */
+    public function list(): \think\Response
     {
         $this->adminAuth();
 
-        $list = Category::order('sort', 'asc')->select();
+        $list = $this->categoryEntity->getList();
 
         return $this->success($list);
     }
 
-    public function tree()
+    /**
+     * 分类树
+     */
+    public function tree(): \think\Response
     {
         $this->adminAuth();
 
-        $list = Category::getTree();
+        $list = $this->categoryEntity->getTree();
 
         return $this->success($list);
     }
 
-    public function options()
+    /**
+     * 分类选项（用于下拉选择）
+     */
+    public function options(): \think\Response
     {
         $this->adminAuth();
 
-        $list = Category::getOptions();
+        $list = $this->categoryEntity->getOptions();
 
         return $this->success($list);
     }
 
-    public function detail()
+    /**
+     * 分类详情
+     */
+    public function detail(): \think\Response
     {
         $this->adminAuth();
-        $id = $this->request->get('id');
 
-        $category = Category::find($id);
+        $id = (int) $this->request->get('id', 0);
+
+        $category = $this->categoryEntity->getDetail($id);
+
         if (!$category) {
             return $this->error('分类不存在');
         }
@@ -49,71 +74,56 @@ class CategoryController extends BaseController
         return $this->success($category);
     }
 
-    public function create()
+    /**
+     * 创建分类
+     */
+    public function create(): \think\Response
     {
         $this->adminAuth();
+
         $data = $this->request->post();
 
-        if (empty($data['name'])) {
-            return $this->error('请输入分类名称');
+        $result = $this->categoryEntity->create($data);
+
+        if (!$result['success']) {
+            return $this->error($result['msg']);
         }
 
-        $category = new Category();
-        $category->pid = $data['pid'] ?? 0;
-        $category->name = $data['name'];
-        $category->icon = $data['icon'] ?? '';
-        $category->image = $data['image'] ?? '';
-        $category->sort = $data['sort'] ?? 100;
-        $category->is_show = $data['is_show'] ?? 1;
-        $category->is_nav = $data['is_nav'] ?? 0;
-        $category->save();
-
-        return $this->success($category);
+        return $this->success($result['data']);
     }
 
-    public function update()
+    /**
+     * 更新分类
+     */
+    public function update(): \think\Response
     {
         $this->adminAuth();
+
         $data = $this->request->post();
 
-        $category = Category::find($data['id']);
-        if (!$category) {
-            return $this->error('分类不存在');
+        $result = $this->categoryEntity->update($data);
+
+        if (!$result['success']) {
+            return $this->error($result['msg']);
         }
 
-        $category->name = $data['name'] ?? $category->name;
-        $category->pid = $data['pid'] ?? $category->pid;
-        $category->icon = $data['icon'] ?? $category->icon;
-        $category->image = $data['image'] ?? $category->image;
-        $category->sort = $data['sort'] ?? $category->sort;
-        $category->is_show = $data['is_show'] ?? $category->is_show;
-        $category->is_nav = $data['is_nav'] ?? $category->is_nav;
-        $category->save();
-
-        return $this->success($category);
+        return $this->success($result['data']);
     }
 
-    public function delete()
+    /**
+     * 删除分类
+     */
+    public function delete(): \think\Response
     {
         $this->adminAuth();
-        $id = $this->request->post('id');
 
-        $category = Category::find($id);
-        if (!$category) {
-            return $this->error('分类不存在');
+        $id = (int) $this->request->post('id', 0);
+
+        $result = $this->categoryEntity->delete($id);
+
+        if (!$result['success']) {
+            return $this->error($result['msg']);
         }
-
-        $hasChildren = Category::where('pid', $id)->count();
-        if ($hasChildren > 0) {
-            return $this->error('请先删除子分类');
-        }
-
-        $hasProducts = \app\common\model\Product::where('category_id', $id)->count();
-        if ($hasProducts > 0) {
-            return $this->error('该分类下有商品，无法删除');
-        }
-
-        $category->delete();
 
         return $this->success();
     }

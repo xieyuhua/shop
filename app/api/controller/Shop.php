@@ -5,64 +5,47 @@ declare(strict_types=1);
 namespace app\api\controller;
 
 use app\common\controller\BaseController;
-use app\common\model\Shop;
-use app\common\model\Product;
+use app\common\entity\ShopControllerEntity;
 
+/**
+ * 店铺控制器 - 仅接收参数和返回结果
+ */
 class ShopController extends BaseController
 {
-    public function list()
+    private ShopControllerEntity $entity;
+
+    public function __construct()
     {
-        $page = $this->request->get('page', 1);
-        $limit = $this->request->get('limit', 15);
-        $categoryId = $this->request->get('category_id', 0);
-        $keyword = $this->request->get('keyword', '');
-        $sort = $this->request->get('sort', 'default');
-
-        $query = Shop::where('status', Shop::STATUS_ACTIVE);
-
-        if ($categoryId > 0) {
-            $query->where('category_id', $categoryId);
-        }
-
-        if ($keyword) {
-            $query->where('shop_name', 'like', '%' . $keyword . '%');
-        }
-
-        switch ($sort) {
-            case 'sales':
-                $query->order('total_sales', 'desc');
-                break;
-            case 'new':
-                $query->order('create_time', 'desc');
-                break;
-            case 'recommend':
-                $query->where('is_recommend', 1)->order('sort', 'asc');
-                break;
-            default:
-                $query->order('sort', 'asc');
-                break;
-        }
-
-        $total = $query->count();
-        $list = $query->page($page, $limit)->select();
-
-        return $this->success([
-            'list' => $list,
-            'total' => $total,
-            'page' => $page,
-            'limit' => $limit,
-            'pages' => ceil($total / $limit),
-        ]);
+        parent::__construct();
+        $this->entity = new ShopControllerEntity();
     }
 
-    public function detail()
+    /**
+     * 店铺列表
+     */
+    public function list(): \think\Response
     {
-        $id = $this->request->get('id');
+        $params = [
+            'page' => $this->request->get('page', 1),
+            'limit' => $this->request->get('limit', 15),
+            'category_id' => $this->request->get('category_id', 0),
+            'keyword' => $this->request->get('keyword', ''),
+            'sort' => $this->request->get('sort', 'default'),
+        ];
 
-        $shop = Shop::with(['category'])
-            ->where('id', $id)
-            ->where('status', Shop::STATUS_ACTIVE)
-            ->find();
+        $result = $this->entity->getList($params);
+
+        return $this->success($result);
+    }
+
+    /**
+     * 店铺详情
+     */
+    public function detail(): \think\Response
+    {
+        $id = (int) $this->request->get('id', 0);
+
+        $shop = $this->entity->getDetail($id);
 
         if (!$shop) {
             return $this->error('店铺不存在');
@@ -71,86 +54,57 @@ class ShopController extends BaseController
         return $this->success($shop);
     }
 
-    public function products()
+    /**
+     * 店铺商品列表
+     */
+    public function products(): \think\Response
     {
         $this->auth();
-        $shopId = $this->request->get('shop_id', 0);
-        $page = $this->request->get('page', 1);
-        $limit = $this->request->get('limit', 15);
-        $sort = $this->request->get('sort', 'latest');
 
+        $shopId = (int) $this->request->get('shop_id', 0);
         if ($shopId <= 0) {
             $shopId = $this->shopId;
         }
 
-        $query = Product::with(['category'])
-            ->where('shop_id', $shopId)
-            ->where('is_on_sale', 1)
-            ->where('status', Product::STATUS_PASS);
+        $params = [
+            'shop_id' => $shopId,
+            'page' => $this->request->get('page', 1),
+            'limit' => $this->request->get('limit', 15),
+            'sort' => $this->request->get('sort', 'latest'),
+        ];
 
-        switch ($sort) {
-            case 'sales':
-                $query->order('sales', 'desc');
-                break;
-            case 'price_asc':
-                $query->order('price', 'asc');
-                break;
-            case 'price_desc':
-                $query->order('price', 'desc');
-                break;
-            default:
-                $query->order('create_time', 'desc');
-                break;
-        }
+        $result = $this->entity->getProducts($params);
 
-        $total = $query->count();
-        $list = $query->page($page, $limit)->select();
-
-        return $this->success([
-            'list' => $list,
-            'total' => $total,
-            'page' => $page,
-            'limit' => $limit,
-            'pages' => ceil($total / $limit),
-        ]);
+        return $this->success($result);
     }
 
-    public function apply()
+    /**
+     * 申请店铺
+     */
+    public function apply(): \think\Response
     {
         $this->auth();
+
         $data = $this->request->post();
 
-        if (empty($data['shop_name'])) {
-            return $this->error('请输入店铺名称');
-        }
-        if (empty($data['contact_name'])) {
-            return $this->error('请输入联系人');
-        }
-        if (empty($data['contact_mobile'])) {
-            return $this->error('请输入联系电话');
-        }
-        if (empty($data['category_id'])) {
-            return $this->error('请选择店铺分类');
+        $result = $this->entity->apply($this->userId, $data);
+
+        if (!$result['success']) {
+            return $this->error($result['msg']);
         }
 
-        $exists = Shop::where('user_id', $this->userId)->find();
-        if ($exists) {
-            return $this->error('您已申请过店铺');
-        }
-
-        $shop = Shop::apply($this->userId, $data);
-
-        return $this->success($shop);
+        return $this->success($result['data']);
     }
 
-    public function info()
+    /**
+     * 我的店铺信息
+     */
+    public function info(): \think\Response
     {
         $this->auth();
         $this->shopAuth();
 
-        $shop = Shop::with(['category'])
-            ->where('user_id', $this->userId)
-            ->find();
+        $shop = $this->entity->getMyShop($this->userId);
 
         if (!$shop) {
             return $this->error('店铺不存在');
@@ -159,19 +113,15 @@ class ShopController extends BaseController
         return $this->success($shop);
     }
 
-    public function statistics()
+    /**
+     * 店铺统计
+     */
+    public function statistics(): \think\Response
     {
         $this->auth();
         $this->shopAuth();
 
-        $shop = Shop::where('id', $this->shopId)->find();
-
-        $data = [
-            'total_products' => Product::where('shop_id', $this->shopId)->count(),
-            'total_sales' => $shop->total_sales ?? 0,
-            'total_amount' => $shop->total_amount ?? 0,
-            'frozen_amount' => $shop->frozen_amount ?? 0,
-        ];
+        $data = $this->entity->getStatistics($this->shopId);
 
         return $this->success($data);
     }
