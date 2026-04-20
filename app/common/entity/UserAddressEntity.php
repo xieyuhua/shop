@@ -4,13 +4,23 @@ declare(strict_types=1);
 
 namespace app\common\entity;
 
-use app\common\model\UserAddress as UserAddressModel;
+use app\common\model\UserAddress;
 
 /**
- * 用户地址实体 - 处理地址相关业务逻辑
+ * 用户地址实体
  */
-class UserAddressEntity
+class UserAddressEntity extends BaseEntity
 {
+    protected $table = 'user_address';
+
+    protected $type = [
+        'is_default' => 'integer',
+        'longitude' => 'float',
+        'latitude' => 'float',
+    ];
+
+    // ========== 业务逻辑 ==========
+
     /**
      * 创建收货地址
      */
@@ -21,12 +31,11 @@ class UserAddressEntity
             return ['success' => false, 'errors' => $errors];
         }
 
-        // 如果设为默认，先取消其他默认
         if (!empty($data['is_default'])) {
-            UserAddressModel::where('user_id', $userId)->update(['is_default' => 0]);
+            self::where('user_id', $userId)->update(['is_default' => 0]);
         }
 
-        $address = new UserAddressModel();
+        $address = new self();
         $address->user_id = $userId;
         $address->consignee = $data['consignee'];
         $address->mobile = $data['mobile'];
@@ -40,10 +49,7 @@ class UserAddressEntity
         $address->latitude = $data['latitude'] ?? 0;
         $address->save();
 
-        return [
-            'success' => true,
-            'data' => $address,
-        ];
+        return ['success' => true, 'data' => $address];
     }
 
     /**
@@ -51,7 +57,7 @@ class UserAddressEntity
      */
     public function update(int $addressId, int $userId, array $data): array
     {
-        $address = UserAddressModel::where('id', $addressId)
+        $address = self::where('id', $addressId)
             ->where('user_id', $userId)
             ->find();
 
@@ -64,9 +70,8 @@ class UserAddressEntity
             return ['success' => false, 'errors' => $errors];
         }
 
-        // 如果设为默认，先取消其他默认
         if (!empty($data['is_default'])) {
-            UserAddressModel::where('user_id', $userId)->update(['is_default' => 0]);
+            self::where('user_id', $userId)->update(['is_default' => 0]);
         }
 
         $address->consignee = $data['consignee'];
@@ -81,10 +86,7 @@ class UserAddressEntity
         $address->latitude = $data['latitude'] ?? 0;
         $address->save();
 
-        return [
-            'success' => true,
-            'data' => $address,
-        ];
+        return ['success' => true, 'data' => $address];
     }
 
     /**
@@ -92,7 +94,7 @@ class UserAddressEntity
      */
     public function delete(int $addressId, int $userId): array
     {
-        $address = UserAddressModel::where('id', $addressId)
+        $address = self::where('id', $addressId)
             ->where('user_id', $userId)
             ->find();
 
@@ -110,15 +112,12 @@ class UserAddressEntity
      */
     public function getList(int $userId): array
     {
-        $list = UserAddressModel::where('user_id', $userId)
+        $list = self::where('user_id', $userId)
             ->order('is_default', 'desc')
             ->order('id', 'desc')
             ->select();
 
-        return [
-            'success' => true,
-            'data' => $list,
-        ];
+        return ['success' => true, 'data' => $list];
     }
 
     /**
@@ -126,7 +125,7 @@ class UserAddressEntity
      */
     public function getDetail(int $addressId, int $userId): array
     {
-        $address = UserAddressModel::where('id', $addressId)
+        $address = self::where('id', $addressId)
             ->where('user_id', $userId)
             ->find();
 
@@ -134,10 +133,7 @@ class UserAddressEntity
             return ['success' => false, 'msg' => '地址不存在'];
         }
 
-        return [
-            'success' => true,
-            'data' => $address,
-        ];
+        return ['success' => true, 'data' => $address];
     }
 
     /**
@@ -145,7 +141,7 @@ class UserAddressEntity
      */
     public function setDefault(int $addressId, int $userId): array
     {
-        $address = UserAddressModel::where('id', $addressId)
+        $address = self::where('id', $addressId)
             ->where('user_id', $userId)
             ->find();
 
@@ -153,7 +149,7 @@ class UserAddressEntity
             return ['success' => false, 'msg' => '地址不存在'];
         }
 
-        UserAddressModel::where('user_id', $userId)->update(['is_default' => 0]);
+        self::where('user_id', $userId)->update(['is_default' => 0]);
         $address->is_default = 1;
         $address->save();
 
@@ -163,9 +159,9 @@ class UserAddressEntity
     /**
      * 获取默认地址
      */
-    public function getDefault(int $userId): ?UserAddressModel
+    public function getDefault(int $userId): ?self
     {
-        return UserAddressModel::where('user_id', $userId)
+        return self::where('user_id', $userId)
             ->where('is_default', 1)
             ->find();
     }

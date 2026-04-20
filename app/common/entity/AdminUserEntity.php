@@ -4,15 +4,33 @@ declare(strict_types=1);
 
 namespace app\common\entity;
 
-use app\common\model\User as UserModel;
+use app\common\model\User;
+use app\common\model\Shop;
+use app\common\model\UserAddress;
 use app\common\model\BalanceLog;
 use app\common\model\PointsLog;
+use think\model\concern\SoftDelete;
 
 /**
- * 后台用户实体 - 处理后台用户管理业务逻辑
+ * 后台用户实体
  */
-class AdminUserEntity
+class AdminUserEntity extends BaseEntity
 {
+    use SoftDelete;
+
+    protected $table = 'user';
+    protected $deleteTime = 'delete_time';
+    protected $defaultSoftDelete = 0;
+
+    protected $type = [
+        'balance' => 'float',
+        'points' => 'integer',
+        'status' => 'integer',
+        'level' => 'integer',
+    ];
+
+    // ========== 业务逻辑 ==========
+
     /**
      * 获取用户列表
      */
@@ -23,9 +41,8 @@ class AdminUserEntity
         $keyword = $params['keyword'] ?? '';
         $status = $params['status'] ?? '';
 
-        $query = UserModel::with(['shop'])->order('id', 'desc');
+        $query = self::with(['shop'])->order('id', 'desc');
 
-        // 关键词搜索（防注入）
         if (!empty($keyword)) {
             $keyword = addcslashes($keyword, '%_');
             $query->where(function ($q) use ($keyword) {
@@ -35,7 +52,6 @@ class AdminUserEntity
             });
         }
 
-        // 状态筛选
         if ($status !== '') {
             $query->where('status', (int) $status);
         }
@@ -56,7 +72,7 @@ class AdminUserEntity
      */
     public function getDetail(int $id): ?array
     {
-        $user = UserModel::with(['shop', 'addresses'])->find($id);
+        $user = self::with(['shop', 'addresses'])->find($id);
         return $user ? $user->toArray() : null;
     }
 
@@ -65,7 +81,7 @@ class AdminUserEntity
      */
     public function setStatus(int $id, int $status): array
     {
-        $user = UserModel::find($id);
+        $user = self::find($id);
         if (!$user) {
             return ['success' => false, 'msg' => '用户不存在'];
         }
@@ -81,7 +97,7 @@ class AdminUserEntity
      */
     public function adjustBalance(int $id, float $amount, string $type, string $remark, int $adminId): array
     {
-        $user = UserModel::find($id);
+        $user = self::find($id);
         if (!$user) {
             return ['success' => false, 'msg' => '用户不存在'];
         }
@@ -96,7 +112,6 @@ class AdminUserEntity
             $log->description = '管理员调整：' . $remark;
             $log->source_type = 'admin';
             $log->source_id = $adminId;
-            $log->create_time = time();
             $log->save();
         } else {
             if ($user->balance < $amount) {
@@ -111,7 +126,6 @@ class AdminUserEntity
             $log->description = '管理员调整：' . $remark;
             $log->source_type = 'admin';
             $log->source_id = $adminId;
-            $log->create_time = time();
             $log->save();
         }
 
@@ -125,7 +139,7 @@ class AdminUserEntity
      */
     public function adjustPoints(int $id, int $points, string $type, string $remark, int $adminId): array
     {
-        $user = UserModel::find($id);
+        $user = self::find($id);
         if (!$user) {
             return ['success' => false, 'msg' => '用户不存在'];
         }
@@ -140,7 +154,6 @@ class AdminUserEntity
             $log->description = '管理员调整：' . $remark;
             $log->source_type = 'admin';
             $log->source_id = $adminId;
-            $log->create_time = time();
             $log->save();
         } else {
             if ($user->points < $points) {
@@ -155,7 +168,6 @@ class AdminUserEntity
             $log->description = '管理员调整：' . $remark;
             $log->source_type = 'admin';
             $log->source_id = $adminId;
-            $log->create_time = time();
             $log->save();
         }
 

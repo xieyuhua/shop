@@ -4,19 +4,25 @@ declare(strict_types=1);
 
 namespace app\common\entity;
 
-use app\common\model\Shop as ShopModel;
+use app\common\model\Shop;
+use app\common\model\User;
+use app\common\model\Category;
+use app\common\model\Order;
+use app\common\model\Product;
 
 /**
- * 店铺实体 - 处理店铺相关业务逻辑
+ * 店铺实体
  */
-class ShopEntity
+class ShopEntity extends BaseEntity
 {
-    private ShopModel $model;
+    protected $table = 'shop';
 
-    public function __construct()
-    {
-        $this->model = new ShopModel();
-    }
+    protected $type = [
+        'longitude' => 'float',
+        'latitude' => 'float',
+    ];
+
+    // ========== 业务逻辑 ==========
 
     /**
      * 获取店铺列表
@@ -28,15 +34,13 @@ class ShopEntity
         $keyword = $params['keyword'] ?? '';
         $status = $params['status'] ?? '';
 
-        $query = ShopModel::with(['user', 'category'])->order('id', 'desc');
+        $query = self::with(['user', 'category'])->order('id', 'desc');
 
-        // 关键词搜索（防注入）
         if (!empty($keyword)) {
             $keyword = addcslashes($keyword, '%_');
             $query->where('shop_name', 'like', '%' . $keyword . '%');
         }
 
-        // 状态筛选
         if ($status !== '') {
             $query->where('status', (int) $status);
         }
@@ -57,7 +61,7 @@ class ShopEntity
      */
     public function getDetail(int $id): ?array
     {
-        $shop = ShopModel::with(['user', 'category'])->find($id);
+        $shop = self::with(['user', 'category'])->find($id);
         return $shop ? $shop->toArray() : null;
     }
 
@@ -66,22 +70,21 @@ class ShopEntity
      */
     public function audit(int $id, int $status, string $reason = ''): array
     {
-        // 参数校验
-        if (!in_array($status, [ShopModel::STATUS_PASS, ShopModel::STATUS_REJECTED])) {
+        if (!in_array($status, [Shop::STATUS_PASS, Shop::STATUS_REJECTED])) {
             return ['success' => false, 'msg' => '审核状态不正确'];
         }
 
-        $shop = ShopModel::find($id);
+        $shop = self::find($id);
         if (!$shop) {
             return ['success' => false, 'msg' => '店铺不存在'];
         }
 
-        if ($shop->status != ShopModel::STATUS_PENDING) {
+        if ($shop->status != Shop::STATUS_PENDING) {
             return ['success' => false, 'msg' => '店铺状态不允许审核'];
         }
 
         $shop->status = $status;
-        if ($status == ShopModel::STATUS_REJECTED) {
+        if ($status == Shop::STATUS_REJECTED) {
             $shop->reject_reason = $reason;
         }
         $shop->audit_time = time();
@@ -95,7 +98,7 @@ class ShopEntity
      */
     public function setStatus(int $id, int $status): array
     {
-        $shop = ShopModel::find($id);
+        $shop = self::find($id);
         if (!$shop) {
             return ['success' => false, 'msg' => '店铺不存在'];
         }
@@ -111,13 +114,13 @@ class ShopEntity
      */
     public function getStats(int $shopId): array
     {
-        $shop = ShopModel::find($shopId);
+        $shop = self::find($shopId);
         if (!$shop) {
             return [];
         }
 
-        $orderCount = \app\common\model\Order::where('shop_id', $shopId)->count();
-        $productCount = \app\common\model\Product::where('shop_id', $shopId)->where('is_on_sale', 1)->count();
+        $orderCount = Order::where('shop_id', $shopId)->count();
+        $productCount = Product::where('shop_id', $shopId)->where('is_on_sale', 1)->count();
 
         return [
             'order_count' => $orderCount,

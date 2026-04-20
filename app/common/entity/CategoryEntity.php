@@ -4,19 +4,29 @@ declare(strict_types=1);
 
 namespace app\common\entity;
 
-use app\common\model\Category as CategoryModel;
+use app\common\model\Category;
 
 /**
- * 分类实体 - 处理分类相关业务逻辑
+ * 分类实体
  */
-class CategoryEntity
+class CategoryEntity extends BaseEntity
 {
+    protected $table = 'category';
+
+    protected $type = [
+        'sort' => 'integer',
+        'pid' => 'integer',
+        'is_show' => 'integer',
+    ];
+
+    // ========== 业务逻辑 ==========
+
     /**
      * 获取分类列表
      */
     public function getList(int $pid = 0, bool $withHidden = false): array
     {
-        $query = CategoryModel::order('sort', 'asc');
+        $query = self::order('sort', 'asc');
 
         if (!$withHidden) {
             $query->where('is_show', 1);
@@ -34,7 +44,7 @@ class CategoryEntity
      */
     public function getTree(): array
     {
-        return CategoryModel::getTree();
+        return Category::getTree();
     }
 
     /**
@@ -42,7 +52,7 @@ class CategoryEntity
      */
     public function getDetail(int $id): ?array
     {
-        $category = CategoryModel::find($id);
+        $category = self::find($id);
         return $category ? $category->toArray() : null;
     }
 
@@ -51,7 +61,7 @@ class CategoryEntity
      */
     public function getChildIds(int $pid): array
     {
-        $ids = CategoryModel::where('pid', $pid)->column('id') ?? [];
+        $ids = self::where('pid', $pid)->column('id') ?? [];
         foreach ($ids as $id) {
             $ids = array_merge($ids, $this->getChildIds($id));
         }
@@ -64,7 +74,7 @@ class CategoryEntity
     public function getBreadcrumb(int $id): array
     {
         $breadcrumb = [];
-        $category = CategoryModel::find($id);
+        $category = self::find($id);
 
         while ($category) {
             array_unshift($breadcrumb, [

@@ -4,15 +4,29 @@ declare(strict_types=1);
 
 namespace app\common\entity;
 
-use app\common\model\Product as ProductModel;
+use app\common\model\Product;
 use app\common\model\ProductSku;
 use app\common\model\ProductSpec;
+use app\common\model\Shop;
+use app\common\model\Category;
 
 /**
- * 后台商品实体 - 处理后台商品管理业务逻辑
+ * 后台商品实体
  */
-class AdminProductEntity
+class AdminProductEntity extends BaseEntity
 {
+    protected $table = 'product';
+
+    protected $type = [
+        'price' => 'float',
+        'cost_price' => 'float',
+        'stock' => 'integer',
+        'sales' => 'integer',
+        'weight' => 'float',
+    ];
+
+    // ========== 业务逻辑 ==========
+
     /**
      * 获取商品列表
      */
@@ -25,25 +39,21 @@ class AdminProductEntity
         $shopId = (int) ($params['shop_id'] ?? 0);
         $status = $params['status'] ?? '';
 
-        $query = ProductModel::with(['shop', 'category']);
+        $query = self::with(['shop', 'category']);
 
-        // 关键词搜索（防注入）
         if ($keyword) {
             $keyword = addcslashes($keyword, '%_');
             $query->where('name', 'like', '%' . $keyword . '%');
         }
 
-        // 分类筛选
         if ($categoryId > 0) {
             $query->where('category_id', $categoryId);
         }
 
-        // 店铺筛选
         if ($shopId > 0) {
             $query->where('shop_id', $shopId);
         }
 
-        // 状态筛选
         if ($status !== '') {
             $query->where('status', (int) $status);
         }
@@ -64,7 +74,7 @@ class AdminProductEntity
      */
     public function getDetail(int $id): ?array
     {
-        $product = ProductModel::with(['shop', 'category', 'specs', 'skus'])->find($id);
+        $product = self::with(['shop', 'category', 'specs', 'skus'])->find($id);
         return $product ? $product->toArray() : null;
     }
 
@@ -73,15 +83,13 @@ class AdminProductEntity
      */
     public function create(int $adminId, array $data): array
     {
-        // 参数校验
         $errors = $this->validateProduct($data);
         if (!empty($errors)) {
             return ['success' => false, 'msg' => implode(', ', $errors)];
         }
 
-        $product = ProductModel::createProduct($data['shop_id'], $data);
+        $product = Product::createProduct($data['shop_id'], $data);
 
-        // 保存规格
         if (!empty($data['specs'])) {
             foreach ($data['specs'] as $spec) {
                 $productSpec = new ProductSpec();
@@ -93,7 +101,6 @@ class AdminProductEntity
             }
         }
 
-        // 保存 SKU
         if (!empty($data['skus'])) {
             foreach ($data['skus'] as $sku) {
                 $productSku = new ProductSku();
@@ -123,7 +130,7 @@ class AdminProductEntity
             return ['success' => false, 'msg' => '商品ID不能为空'];
         }
 
-        $product = ProductModel::find($data['id']);
+        $product = self::find($data['id']);
         if (!$product) {
             return ['success' => false, 'msg' => '商品不存在'];
         }
@@ -151,7 +158,7 @@ class AdminProductEntity
      */
     public function delete(int $id): array
     {
-        $product = ProductModel::find($id);
+        $product = self::find($id);
         if (!$product) {
             return ['success' => false, 'msg' => '商品不存在'];
         }
@@ -160,7 +167,6 @@ class AdminProductEntity
             return ['success' => false, 'msg' => '该商品有销售记录，无法删除'];
         }
 
-        // 删除关联数据
         ProductSku::where('product_id', $id)->delete();
         ProductSpec::where('product_id', $id)->delete();
         $product->delete();
@@ -173,12 +179,12 @@ class AdminProductEntity
      */
     public function audit(int $id, int $status): array
     {
-        $product = ProductModel::find($id);
+        $product = self::find($id);
         if (!$product) {
             return ['success' => false, 'msg' => '商品不存在'];
         }
 
-        if ($product->status != ProductModel::STATUS_PENDING) {
+        if ($product->status != Product::STATUS_PENDING) {
             return ['success' => false, 'msg' => '商品状态不允许审核'];
         }
 
@@ -207,15 +213,12 @@ class AdminProductEntity
         }
 
         if (!empty($updateData)) {
-            ProductModel::whereIn('id', $ids)->update($updateData);
+            self::whereIn('id', $ids)->update($updateData);
         }
 
         return ['success' => true];
     }
 
-    /**
-     * 校验商品数据
-     */
     private function validateProduct(array $data): array
     {
         $errors = [];

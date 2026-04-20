@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace app\common\entity;
 
-use app\common\model\Shop as ShopModel;
-use app\common\model\Product as ProductModel;
+use app\common\model\Shop;
+use app\common\model\Product;
 
 /**
- * 店铺控制器实体 - 处理店铺相关业务逻辑（API端）
+ * 店铺控制器实体（API端）
  */
 class ShopControllerEntity
 {
@@ -23,20 +23,17 @@ class ShopControllerEntity
         $keyword = $params['keyword'] ?? '';
         $sort = $params['sort'] ?? 'default';
 
-        $query = ShopModel::where('status', ShopModel::STATUS_ACTIVE);
+        $query = Shop::where('status', Shop::STATUS_ACTIVE);
 
-        // 分类筛选
         if ($categoryId > 0) {
             $query->where('category_id', $categoryId);
         }
 
-        // 关键词搜索（防注入）
         if ($keyword) {
             $keyword = addcslashes($keyword, '%_');
             $query->where('shop_name', 'like', '%' . $keyword . '%');
         }
 
-        // 排序
         $query = $this->applySort($query, $sort);
 
         $total = $query->count();
@@ -56,9 +53,9 @@ class ShopControllerEntity
      */
     public function getDetail(int $id): ?array
     {
-        $shop = ShopModel::with(['category'])
+        $shop = Shop::with(['category'])
             ->where('id', $id)
-            ->where('status', ShopModel::STATUS_ACTIVE)
+            ->where('status', Shop::STATUS_ACTIVE)
             ->find();
 
         return $shop ? $shop->toArray() : null;
@@ -74,12 +71,11 @@ class ShopControllerEntity
         $limit = min(50, max(1, (int) ($params['limit'] ?? 15)));
         $sort = $params['sort'] ?? 'latest';
 
-        $query = ProductModel::with(['category'])
+        $query = Product::with(['category'])
             ->where('shop_id', $shopId)
             ->where('is_on_sale', 1)
-            ->where('status', ProductModel::STATUS_PASS);
+            ->where('status', Product::STATUS_PASS);
 
-        // 排序
         $query = $this->applyProductSort($query, $sort);
 
         $total = $query->count();
@@ -99,19 +95,17 @@ class ShopControllerEntity
      */
     public function apply(int $userId, array $data): array
     {
-        // 参数校验
         $errors = $this->validateApply($data);
         if (!empty($errors)) {
             return ['success' => false, 'msg' => implode(', ', $errors)];
         }
 
-        // 检查是否已有店铺
-        $exists = ShopModel::where('user_id', $userId)->find();
+        $exists = Shop::where('user_id', $userId)->find();
         if ($exists) {
             return ['success' => false, 'msg' => '您已申请过店铺'];
         }
 
-        $shop = ShopModel::apply($userId, $data);
+        $shop = Shop::apply($userId, $data);
 
         return ['success' => true, 'data' => $shop->toArray()];
     }
@@ -121,7 +115,7 @@ class ShopControllerEntity
      */
     public function getMyShop(int $userId): ?array
     {
-        $shop = ShopModel::with(['category'])
+        $shop = Shop::with(['category'])
             ->where('user_id', $userId)
             ->find();
 
@@ -133,22 +127,19 @@ class ShopControllerEntity
      */
     public function getStatistics(int $shopId): array
     {
-        $shop = ShopModel::find($shopId);
+        $shop = Shop::find($shopId);
         if (!$shop) {
             return [];
         }
 
         return [
-            'total_products' => ProductModel::where('shop_id', $shopId)->count(),
+            'total_products' => Product::where('shop_id', $shopId)->count(),
             'total_sales' => $shop->total_sales ?? 0,
             'total_amount' => $shop->total_amount ?? 0,
             'frozen_amount' => $shop->frozen_amount ?? 0,
         ];
     }
 
-    /**
-     * 校验申请数据
-     */
     private function validateApply(array $data): array
     {
         $errors = [];
@@ -169,9 +160,6 @@ class ShopControllerEntity
         return $errors;
     }
 
-    /**
-     * 应用店铺排序
-     */
     private function applySort($query, string $sort)
     {
         return match ($sort) {
@@ -182,9 +170,6 @@ class ShopControllerEntity
         };
     }
 
-    /**
-     * 应用商品排序
-     */
     private function applyProductSort($query, string $sort)
     {
         return match ($sort) {

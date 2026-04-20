@@ -4,50 +4,56 @@ declare(strict_types=1);
 
 namespace app\common\entity;
 
-use app\common\model\Order as OrderModel;
-use app\common\model\OrderGoods as OrderGoodsModel;
-use app\common\model\OrderAftersale as AftersaleModel;
-use app\common\model\Product as ProductModel;
-use app\common\model\ProductSku as ProductSkuModel;
-use app\common\model\BalanceLog as BalanceLogModel;
+use app\common\model\Order;
+use app\common\model\OrderGoods;
+use app\common\model\OrderAftersale;
+use app\common\model\Product;
+use app\common\model\ProductSku;
+use app\common\model\BalanceLog;
+use app\common\model\User;
 
 /**
- * 售后实体 - 处理售前售后相关业务逻辑
+ * 售后实体
  */
-class AftersaleEntity
+class AftersaleEntity extends BaseEntity
 {
+    protected $table = 'order_aftersale';
+
+    protected $type = [
+        'refund_money' => 'float',
+    ];
+
+    // ========== 业务逻辑 ==========
+
     /**
      * 申请售后
      */
     public function apply(int $userId, array $data): array
     {
         $orderId = $data['order_id'] ?? 0;
-        $type = $data['type'] ?? 1; // 1=退款 2=退货退款
+        $type = $data['type'] ?? 1;
         $reason = $data['reason'] ?? '';
         $refundMoney = $data['refund_money'] ?? 0;
         $images = $data['images'] ?? [];
 
-        // 验证订单
-        $order = OrderModel::where('id', $orderId)
+        $order = Order::where('id', $orderId)
             ->where('user_id', $userId)
             ->find();
         if (!$order) {
             return ['success' => false, 'msg' => '订单不存在'];
         }
 
-        // 验证订单状态
         if (!in_array($order->order_status, [
-            OrderModel::STATUS_PENDING_DELIVERY,
-            OrderModel::STATUS_PENDING_RECEIVE,
-            OrderModel::STATUS_PENDING_COMMENT,
-            OrderModel::STATUS_COMPLETED
+            Order::STATUS_PENDING_DELIVERY,
+            Order::STATUS_PENDING_RECEIVE,
+            Order::STATUS_PENDING_COMMENT,
+            Order::STATUS_COMPLETED
         ])) {
             return ['success' => false, 'msg' => '当前订单状态不支持售后申请'];
         }
 
-        // 检查是否有进行中的售后
-        $existingAftersale = AftersaleModel::where('order_id', $orderId)
-            ->whereIn('status', [AftersaleModel::STATUS_PENDING, AftersaleModel::STATUS_PROCESSING])
+        $existingAftersale = self::where('order_id', $orderId)
+            ->whereIn('status', [OrderAftersale::STATUS_PENDING, OrderAftersale::STATUS_PROCESSING])
             ->find();
         if ($existingAftersale) {
             return ['success' => false, 'msg' => '该订单存在进行中的售后申请'];
@@ -57,21 +63,19 @@ class AftersaleEntity
             return ['success' => false, 'msg' => '请填写售后原因'];
         }
 
-        // 创建售后申请
-        $aftersale = new AftersaleModel();
+        $aftersale = new self();
         $aftersale->order_id = $orderId;
         $aftersale->user_id = $userId;
         $aftersale->type = $type;
         $aftersale->reason = $reason;
         $aftersale->refund_money = $refundMoney > 0 ? $refundMoney : $order->pay_price;
         $aftersale->images = is_array($images) ? json_encode($images) : '';
-        $aftersale->status = AftersaleModel::STATUS_PENDING;
+        $aftersale->status = OrderAftersale::STATUS_PENDING;
         $aftersale->description = $data['description'] ?? '';
         $aftersale->save();
 
-        // 更新订单状态
-        if ($order->order_status == OrderModel::STATUS_PENDING_DELIVERY) {
-            $order->order_status = OrderModel::STATUS_REFUNDING;
+        if ($order->order_status == Order::STATUS_PENDING_DELIVERY) {
+            $order->order_status = Order::STATUS_REFUNDING;
             $order->save();
         }
 
@@ -90,7 +94,7 @@ class AftersaleEntity
      */
     public function cancel(int $aftersaleId, int $userId): array
     {
-        $aftersale = AftersaleModel::where('id', $aftersaleId)
+        $aftersale = self::where('id', $aftersaleId)
             ->where('user_id', $userId)
             ->find();
 
@@ -98,22 +102,20 @@ class AftersaleEntity
             return ['success' => false, 'msg' => '售后申请不存在'];
         }
 
-        if ($aftersale->status != AftersaleModel::STATUS_PENDING) {
+        if ($aftersale->status != OrderAftersale::STATUS_PENDING) {
             return ['success' => false, 'msg' => '当前状态不允许取消'];
         }
 
-        $aftersale->status = AftersaleModel::STATUS_CANCELLED;
+        $aftersale->status = OrderAftersale::STATUS_CANCELLED;
         $aftersale->cancel_time = time();
         $aftersale->save();
 
-        // 恢复订单状态
-        $order = OrderModel::find($aftersale->order_id);
-        if ($order && $order->order_status == OrderModel::STATUS_REFUNDING) {
-            // 根据支付状态恢复
-            if ($order->pay_status == OrderModel::PAY_STATUS_PAID) {
-                $order->order_status = OrderModel::STATUS_PENDING_DELIVERY;
+        $order = Order::find($aftersale->order_id);
+        if ($order && $order->order_status == Order::STATUS_REFUNDING) {
+            if ($order->pay_status == Order::PAY_STATUS_PAID) {
+                $order->order_status = Order::STATUS_PENDING_DELIVERY;
             } else {
-                $order->order_status = OrderModel::STATUS_PENDING_PAY;
+                $order->order_status = Order::STATUS_PENDING_PAY;
             }
             $order->save();
         }
@@ -126,7 +128,7 @@ class AftersaleEntity
      */
     public function getList(int $userId, int $page = 1, int $limit = 15): array
     {
-        $query = AftersaleModel::with(['order', 'orderGoods'])
+        $query = self::with(['order', 'orderGoods'])
             ->where('user_id', $userId)
             ->order('id', 'desc');
 
@@ -150,7 +152,7 @@ class AftersaleEntity
      */
     public function getDetail(int $aftersaleId, int $userId): array
     {
-        $aftersale = AftersaleModel::with(['order', 'orderGoods'])
+        $aftersale = self::with(['order', 'orderGoods'])
             ->where('id', $aftersaleId)
             ->where('user_id', $userId)
             ->find();
@@ -159,18 +161,15 @@ class AftersaleEntity
             return ['success' => false, 'msg' => '售后申请不存在'];
         }
 
-        return [
-            'success' => true,
-            'data' => $aftersale,
-        ];
+        return ['success' => true, 'data' => $aftersale];
     }
 
     /**
-     * 用户邮寄商品（退货时）
+     * 用户邮寄商品
      */
     public function deliver(int $aftersaleId, int $userId, array $data): array
     {
-        $aftersale = AftersaleModel::where('id', $aftersaleId)
+        $aftersale = self::where('id', $aftersaleId)
             ->where('user_id', $userId)
             ->find();
 
@@ -178,11 +177,11 @@ class AftersaleEntity
             return ['success' => false, 'msg' => '售后申请不存在'];
         }
 
-        if ($aftersale->status != AftersaleModel::STATUS_PROCESSING) {
+        if ($aftersale->status != OrderAftersale::STATUS_PROCESSING) {
             return ['success' => false, 'msg' => '当前状态不允许操作'];
         }
 
-        if ($aftersale->type != AftersaleModel::TYPE_RETURN) {
+        if ($aftersale->type != OrderAftersale::TYPE_RETURN) {
             return ['success' => false, 'msg' => '当前售后类型不需要邮寄'];
         }
 
@@ -195,11 +194,11 @@ class AftersaleEntity
     }
 
     /**
-     * 商家同意售后（退款）
+     * 商家同意售后
      */
     public function agreeRefund(int $aftersaleId, int $shopId): array
     {
-        $aftersale = AftersaleModel::where('id', $aftersaleId)
+        $aftersale = self::where('id', $aftersaleId)
             ->where('shop_id', $shopId)
             ->find();
 
@@ -207,36 +206,33 @@ class AftersaleEntity
             return ['success' => false, 'msg' => '售后申请不存在'];
         }
 
-        if ($aftersale->status != AftersaleModel::STATUS_PENDING) {
+        if ($aftersale->status != OrderAftersale::STATUS_PENDING) {
             return ['success' => false, 'msg' => '当前状态不允许操作'];
         }
 
-        // 退款到余额
-        $user = \app\common\model\User::find($aftersale->user_id);
+        $user = User::find($aftersale->user_id);
         if ($user) {
             $user->balance = $user->balance + $aftersale->refund_money;
             $user->save();
 
-            $balanceLog = new BalanceLogModel();
+            $balanceLog = new BalanceLog();
             $balanceLog->user_id = $aftersale->user_id;
-            $balanceLog->change_type = BalanceLogModel::TYPE_INCOME;
+            $balanceLog->change_type = BalanceLog::TYPE_INCOME;
             $balanceLog->balance = $aftersale->refund_money;
             $balanceLog->description = '售后退款：' . $aftersale->reason;
             $balanceLog->source_type = 'aftersale';
             $balanceLog->source_id = $aftersale->id;
-            $balanceLog->create_time = time();
             $balanceLog->save();
         }
 
-        $aftersale->status = AftersaleModel::STATUS_AGREE;
+        $aftersale->status = OrderAftersale::STATUS_AGREE;
         $aftersale->refund_time = time();
         $aftersale->save();
 
-        // 更新订单状态
-        $order = OrderModel::find($aftersale->order_id);
+        $order = Order::find($aftersale->order_id);
         if ($order) {
-            if ($aftersale->type == AftersaleModel::TYPE_REFUND) {
-                $order->order_status = OrderModel::STATUS_REFUNDED;
+            if ($aftersale->type == OrderAftersale::TYPE_REFUND) {
+                $order->order_status = Order::STATUS_REFUNDED;
             }
             $order->save();
         }
@@ -249,7 +245,7 @@ class AftersaleEntity
      */
     public function refuse(int $aftersaleId, int $shopId, string $reason): array
     {
-        $aftersale = AftersaleModel::where('id', $aftersaleId)
+        $aftersale = self::where('id', $aftersaleId)
             ->where('shop_id', $shopId)
             ->find();
 
@@ -257,22 +253,21 @@ class AftersaleEntity
             return ['success' => false, 'msg' => '售后申请不存在'];
         }
 
-        if ($aftersale->status != AftersaleModel::STATUS_PENDING) {
+        if ($aftersale->status != OrderAftersale::STATUS_PENDING) {
             return ['success' => false, 'msg' => '当前状态不允许操作'];
         }
 
-        $aftersale->status = AftersaleModel::STATUS_REFUSE;
+        $aftersale->status = OrderAftersale::STATUS_REFUSE;
         $aftersale->refuse_reason = $reason;
         $aftersale->refuse_time = time();
         $aftersale->save();
 
-        // 恢复订单状态
-        $order = OrderModel::find($aftersale->order_id);
-        if ($order && $order->order_status == OrderModel::STATUS_REFUNDING) {
-            if ($order->pay_status == OrderModel::PAY_STATUS_PAID) {
-                $order->order_status = OrderModel::STATUS_PENDING_DELIVERY;
+        $order = Order::find($aftersale->order_id);
+        if ($order && $order->order_status == Order::STATUS_REFUNDING) {
+            if ($order->pay_status == Order::PAY_STATUS_PAID) {
+                $order->order_status = Order::STATUS_PENDING_DELIVERY;
             } else {
-                $order->order_status = OrderModel::STATUS_PENDING_PAY;
+                $order->order_status = Order::STATUS_PENDING_PAY;
             }
             $order->save();
         }
@@ -285,7 +280,7 @@ class AftersaleEntity
      */
     public function confirmReturn(int $aftersaleId, int $shopId): array
     {
-        $aftersale = AftersaleModel::where('id', $aftersaleId)
+        $aftersale = self::where('id', $aftersaleId)
             ->where('shop_id', $shopId)
             ->find();
 
@@ -293,42 +288,39 @@ class AftersaleEntity
             return ['success' => false, 'msg' => '售后申请不存在'];
         }
 
-        if ($aftersale->status != AftersaleModel::STATUS_PROCESSING || empty($aftersale->express_no)) {
+        if ($aftersale->status != OrderAftersale::STATUS_PROCESSING || empty($aftersale->express_no)) {
             return ['success' => false, 'msg' => '当前状态不允许操作'];
         }
 
-        // 退款到余额
-        $user = \app\common\model\User::find($aftersale->user_id);
+        $user = User::find($aftersale->user_id);
         if ($user) {
             $user->balance = $user->balance + $aftersale->refund_money;
             $user->save();
 
-            $balanceLog = new BalanceLogModel();
+            $balanceLog = new BalanceLog();
             $balanceLog->user_id = $aftersale->user_id;
-            $balanceLog->change_type = BalanceLogModel::TYPE_INCOME;
+            $balanceLog->change_type = BalanceLog::TYPE_INCOME;
             $balanceLog->balance = $aftersale->refund_money;
             $balanceLog->description = '售后退货退款：' . $aftersale->reason;
             $balanceLog->source_type = 'aftersale';
             $balanceLog->source_id = $aftersale->id;
-            $balanceLog->create_time = time();
             $balanceLog->save();
         }
 
-        $aftersale->status = AftersaleModel::STATUS_AGREE;
+        $aftersale->status = OrderAftersale::STATUS_AGREE;
         $aftersale->refund_time = time();
         $aftersale->save();
 
-        // 恢复库存
-        $orderGoods = OrderGoodsModel::where('order_id', $aftersale->order_id)->find();
+        $orderGoods = OrderGoods::where('order_id', $aftersale->order_id)->find();
         if ($orderGoods) {
             if ($orderGoods->sku_id > 0) {
-                $sku = ProductSkuModel::find($orderGoods->sku_id);
+                $sku = ProductSku::find($orderGoods->sku_id);
                 if ($sku) {
                     $sku->stock = $sku->stock + $orderGoods->num;
                     $sku->save();
                 }
             } else {
-                $product = ProductModel::find($orderGoods->product_id);
+                $product = Product::find($orderGoods->product_id);
                 if ($product) {
                     $product->stock = $product->stock + $orderGoods->num;
                     $product->save();
@@ -336,10 +328,9 @@ class AftersaleEntity
             }
         }
 
-        // 更新订单状态
-        $order = OrderModel::find($aftersale->order_id);
+        $order = Order::find($aftersale->order_id);
         if ($order) {
-            $order->order_status = OrderModel::STATUS_REFUNDED;
+            $order->order_status = Order::STATUS_REFUNDED;
             $order->save();
         }
 

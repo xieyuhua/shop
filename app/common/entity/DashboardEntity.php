@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace app\common\entity;
 
-use app\common\model\User as UserModel;
-use app\common\model\Order as OrderModel;
-use app\common\model\Shop as ShopModel;
-use app\common\model\Product as ProductModel;
-use app\common\model\OrderAftersale as AftersaleModel;
+use app\common\model\User;
+use app\common\model\Order;
+use app\common\model\Shop;
+use app\common\model\Product;
+use app\common\model\OrderAftersale;
 
 /**
- * 仪表盘实体 - 处理后台统计数据业务逻辑
+ * 仪表盘实体
  */
 class DashboardEntity
 {
@@ -24,39 +24,39 @@ class DashboardEntity
         $yesterday = strtotime('yesterday');
 
         // 用户统计
-        $totalUsers = UserModel::count();
-        $todayUsers = UserModel::whereTime('create_time', 'today')->count();
-        $yesterdayUsers = UserModel::whereTime('create_time', 'yesterday')->count();
+        $totalUsers = User::count();
+        $todayUsers = User::whereTime('create_time', 'today')->count();
+        $yesterdayUsers = User::whereTime('create_time', 'yesterday')->count();
 
         // 订单统计
-        $totalOrders = OrderModel::count();
-        $todayOrders = OrderModel::whereTime('create_time', 'today')->count();
-        $yesterdayOrders = OrderModel::whereTime('create_time', 'yesterday')->count();
+        $totalOrders = Order::count();
+        $todayOrders = Order::whereTime('create_time', 'today')->count();
+        $yesterdayOrders = Order::whereTime('create_time', 'yesterday')->count();
 
         // 今日销售额
-        $todaySales = OrderModel::where('pay_status', OrderModel::PAY_STATUS_PAID)
+        $todaySales = Order::where('pay_status', Order::PAY_STATUS_PAID)
             ->whereTime('pay_time', 'today')
             ->sum('pay_price');
 
         // 昨日销售额
-        $yesterdaySales = OrderModel::where('pay_status', OrderModel::PAY_STATUS_PAID)
+        $yesterdaySales = Order::where('pay_status', Order::PAY_STATUS_PAID)
             ->whereBetween('pay_time', [$yesterday, $today - 1])
             ->sum('pay_price');
 
         // 店铺统计
-        $totalShops = ShopModel::count();
-        $pendingShops = ShopModel::where('status', ShopModel::STATUS_PENDING)->count();
+        $totalShops = Shop::count();
+        $pendingShops = Shop::where('status', Shop::STATUS_PENDING)->count();
 
         // 商品统计
-        $totalProducts = ProductModel::count();
-        $offShelfProducts = ProductModel::where('is_on_sale', 0)->count();
+        $totalProducts = Product::count();
+        $offShelfProducts = Product::where('is_on_sale', 0)->count();
 
         // 订单状态分布
         $orderStatus = [
-            'pending_pay' => OrderModel::where('order_status', OrderModel::STATUS_PENDING_PAY)->count(),
-            'pending_delivery' => OrderModel::where('order_status', OrderModel::STATUS_PENDING_DELIVERY)->count(),
-            'pending_receive' => OrderModel::where('order_status', OrderModel::STATUS_PENDING_RECEIVE)->count(),
-            'pending_comment' => OrderModel::where('order_status', OrderModel::STATUS_PENDING_COMMENT)->count(),
+            'pending_pay' => Order::where('order_status', Order::STATUS_PENDING_PAY)->count(),
+            'pending_delivery' => Order::where('order_status', Order::STATUS_PENDING_DELIVERY)->count(),
+            'pending_receive' => Order::where('order_status', Order::STATUS_PENDING_RECEIVE)->count(),
+            'pending_comment' => Order::where('order_status', Order::STATUS_PENDING_COMMENT)->count(),
         ];
 
         // 近7天销售趋势
@@ -66,7 +66,7 @@ class DashboardEntity
         $userTrend = $this->getUserTrend();
 
         // 最近订单
-        $recentOrders = OrderModel::with(['user', 'shop'])
+        $recentOrders = Order::with(['user', 'shop'])
             ->order('id', 'desc')
             ->limit(10)
             ->select();
@@ -109,10 +109,10 @@ class DashboardEntity
      */
     public function getQuickStats(): array
     {
-        $pendingOrders = OrderModel::where('order_status', OrderModel::STATUS_PENDING_DELIVERY)->count();
-        $pendingAftersales = AftersaleModel::where('status', AftersaleModel::STATUS_PENDING)->count();
-        $pendingShops = ShopModel::where('status', ShopModel::STATUS_PENDING)->count();
-        $pendingProducts = ProductModel::where('status', 0)->count();
+        $pendingOrders = Order::where('order_status', Order::STATUS_PENDING_DELIVERY)->count();
+        $pendingAftersales = OrderAftersale::where('status', OrderAftersale::STATUS_PENDING)->count();
+        $pendingShops = Shop::where('status', Shop::STATUS_PENDING)->count();
+        $pendingProducts = Product::where('status', 0)->count();
 
         return [
             'pending_orders' => $pendingOrders,
@@ -133,11 +133,11 @@ class DashboardEntity
             $start = strtotime($date);
             $end = strtotime($date . ' 23:59:59');
 
-            $sales = OrderModel::where('pay_status', OrderModel::PAY_STATUS_PAID)
+            $sales = Order::where('pay_status', Order::PAY_STATUS_PAID)
                 ->whereBetween('pay_time', [$start, $end])
                 ->sum('pay_price');
 
-            $orderCount = OrderModel::where('pay_status', OrderModel::PAY_STATUS_PAID)
+            $orderCount = Order::where('pay_status', Order::PAY_STATUS_PAID)
                 ->whereBetween('pay_time', [$start, $end])
                 ->count();
 
@@ -158,7 +158,7 @@ class DashboardEntity
         $trend = [];
         for ($i = 6; $i >= 0; $i--) {
             $date = date('Y-m-d', strtotime("-{$i} days"));
-            $userCount = UserModel::whereTime('create_time', $date)->count();
+            $userCount = User::whereTime('create_time', $date)->count();
 
             $trend[] = [
                 'date' => $date,

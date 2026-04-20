@@ -6,9 +6,10 @@ namespace app\common\entity;
 
 use app\common\model\BalanceLog;
 use app\common\model\PointsLog;
+use app\common\model\User;
 
 /**
- * 用户日志实体 - 处理余额/积分变动日志
+ * 用户日志实体
  */
 class UserLogEntity
 {
@@ -84,21 +85,15 @@ class UserLogEntity
         return $log->save();
     }
 
-    /**
-     * 获取用户当前余额
-     */
     private function getUserBalance(int $userId): float
     {
-        $user = \app\common\model\User::find($userId);
+        $user = User::find($userId);
         return $user ? (float) $user->balance : 0;
     }
 
-    /**
-     * 获取用户当前积分
-     */
     private function getUserPoints(int $userId): int
     {
-        $user = \app\common\model\User::find($userId);
+        $user = User::find($userId);
         return $user ? (int) $user->points : 0;
     }
 }

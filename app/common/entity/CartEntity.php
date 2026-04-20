@@ -4,28 +4,36 @@ declare(strict_types=1);
 
 namespace app\common\entity;
 
-use app\common\model\Cart as CartModel;
-use app\common\model\Product as ProductModel;
-use app\common\model\ProductSku as ProductSkuModel;
+use app\common\model\Cart;
+use app\common\model\Product;
+use app\common\model\ProductSku;
+use app\common\model\Shop;
 
 /**
- * 购物车实体 - 处理购物车相关业务逻辑
+ * 购物车实体
  */
-class CartEntity
+class CartEntity extends BaseEntity
 {
+    protected $table = 'cart';
+
+    protected $type = [
+        'num' => 'integer',
+    ];
+
+    // ========== 业务逻辑 ==========
+
     /**
      * 添加商品到购物车
      */
     public function add(int $userId, int $productId, int $num, int $skuId = 0): array
     {
-        $product = ProductModel::find($productId);
+        $product = Product::find($productId);
         if (!$product || !$product->is_on_sale) {
             return ['success' => false, 'msg' => '商品已下架'];
         }
 
-        // 检查 SKU
         if ($skuId > 0) {
-            $sku = ProductSkuModel::find($skuId);
+            $sku = ProductSku::find($skuId);
             if (!$sku || $sku->product_id != $productId) {
                 return ['success' => false, 'msg' => 'SKU不存在'];
             }
@@ -38,19 +46,17 @@ class CartEntity
             }
         }
 
-        // 检查是否已存在
-        $where = [
+        $cart = self::where([
             'user_id' => $userId,
             'product_id' => $productId,
             'sku_id' => $skuId,
-        ];
+        ])->find();
 
-        $cart = CartModel::where($where)->find();
         if ($cart) {
             $cart->num = $cart->num + $num;
             $cart->save();
         } else {
-            $cart = new CartModel();
+            $cart = new self();
             $cart->user_id = $userId;
             $cart->product_id = $productId;
             $cart->sku_id = $skuId;
@@ -60,10 +66,7 @@ class CartEntity
             $cart->save();
         }
 
-        return [
-            'success' => true,
-            'data' => $cart,
-        ];
+        return ['success' => true, 'data' => $cart];
     }
 
     /**
@@ -71,7 +74,7 @@ class CartEntity
      */
     public function updateNum(int $cartId, int $userId, int $num): array
     {
-        $cart = CartModel::where('id', $cartId)
+        $cart = self::where('id', $cartId)
             ->where('user_id', $userId)
             ->find();
 
@@ -84,14 +87,13 @@ class CartEntity
             return ['success' => true, 'data' => ['deleted' => true]];
         }
 
-        // 检查库存
         if ($cart->sku_id > 0) {
-            $sku = ProductSkuModel::find($cart->sku_id);
+            $sku = ProductSku::find($cart->sku_id);
             if (!$sku || $sku->stock < $num) {
                 return ['success' => false, 'msg' => '库存不足'];
             }
         } else {
-            $product = ProductModel::find($cart->product_id);
+            $product = Product::find($cart->product_id);
             if (!$product || $product->stock < $num) {
                 return ['success' => false, 'msg' => '库存不足'];
             }
@@ -100,10 +102,7 @@ class CartEntity
         $cart->num = $num;
         $cart->save();
 
-        return [
-            'success' => true,
-            'data' => $cart,
-        ];
+        return ['success' => true, 'data' => $cart];
     }
 
     /**
@@ -111,7 +110,7 @@ class CartEntity
      */
     public function delete(int $cartId, int $userId): array
     {
-        $cart = CartModel::where('id', $cartId)
+        $cart = self::where('id', $cartId)
             ->where('user_id', $userId)
             ->find();
 
@@ -129,7 +128,7 @@ class CartEntity
      */
     public function clear(int $userId): array
     {
-        CartModel::where('user_id', $userId)->delete();
+        self::where('user_id', $userId)->delete();
 
         return ['success' => true];
     }
@@ -139,7 +138,7 @@ class CartEntity
      */
     public function getList(int $userId): array
     {
-        $carts = CartModel::with(['product', 'sku', 'shop'])
+        $carts = self::with(['product', 'sku', 'shop'])
             ->where('user_id', $userId)
             ->select();
 
@@ -179,10 +178,7 @@ class CartEntity
             $list[$shopId]['total_price'] += $item['total_price'];
         }
 
-        return [
-            'success' => true,
-            'data' => array_values($list),
-        ];
+        return ['success' => true, 'data' => array_values($list)];
     }
 
     /**
@@ -190,7 +186,7 @@ class CartEntity
      */
     public function getSelectedTotal(int $userId): array
     {
-        $carts = CartModel::with(['product', 'sku'])
+        $carts = self::with(['product', 'sku'])
             ->where('user_id', $userId)
             ->where('selected', 1)
             ->select();
@@ -203,13 +199,7 @@ class CartEntity
             $num += $cart->num;
         }
 
-        return [
-            'success' => true,
-            'data' => [
-                'total' => $total,
-                'num' => $num,
-            ],
-        ];
+        return ['success' => true, 'data' => ['total' => $total, 'num' => $num]];
     }
 
     /**
@@ -217,7 +207,7 @@ class CartEntity
      */
     public function toggleSelected(int $cartId, int $userId): array
     {
-        $cart = CartModel::where('id', $cartId)
+        $cart = self::where('id', $cartId)
             ->where('user_id', $userId)
             ->find();
 
@@ -228,10 +218,7 @@ class CartEntity
         $cart->selected = $cart->selected ? 0 : 1;
         $cart->save();
 
-        return [
-            'success' => true,
-            'data' => $cart,
-        ];
+        return ['success' => true, 'data' => $cart];
     }
 
     /**
@@ -239,7 +226,7 @@ class CartEntity
      */
     public function selectAll(int $userId, int $selected = 1): array
     {
-        CartModel::where('user_id', $userId)->update(['selected' => $selected]);
+        self::where('user_id', $userId)->update(['selected' => $selected]);
 
         return ['success' => true];
     }
@@ -249,29 +236,10 @@ class CartEntity
      */
     public function deleteSelected(int $userId): array
     {
-        CartModel::where('user_id', $userId)
+        self::where('user_id', $userId)
             ->where('selected', 1)
             ->delete();
 
         return ['success' => true];
-    }
-
-    /**
-     * 获取已选购物车商品
-     */
-    public function getSelectedCarts(int $userId, array $cartIds = []): array
-    {
-        $query = CartModel::with(['product', 'sku'])
-            ->where('user_id', $userId)
-            ->where('selected', 1);
-
-        if (!empty($cartIds)) {
-            $query->whereIn('id', $cartIds);
-        }
-
-        return [
-            'success' => true,
-            'data' => $query->select(),
-        ];
     }
 }

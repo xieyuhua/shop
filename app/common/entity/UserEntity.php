@@ -4,20 +4,52 @@ declare(strict_types=1);
 
 namespace app\common\entity;
 
-use app\common\model\User as UserModel;
 use app\common\library\JwtAuth;
+use app\common\model\UserAddress;
+use think\model\concern\SoftDelete;
 
 /**
- * 用户实体 - 处理用户相关业务逻辑
+ * 用户实体
  */
-class UserEntity
+class UserEntity extends BaseEntity
 {
-    private UserModel $model;
+    use SoftDelete;
 
-    public function __construct(UserModel $model = null)
+    protected $table = 'user';
+    protected $deleteTime = 'delete_time';
+    protected $defaultSoftDelete = 0;
+
+    protected $type = [
+        'balance' => 'float',
+        'points' => 'integer',
+        'status' => 'integer',
+        'gender' => 'integer',
+        'level' => 'integer',
+    ];
+
+    // ========== 修改器 ==========
+
+    public function setPasswordAttr($value)
     {
-        $this->model = $model ?? new UserModel();
+        return password_hash($value, PASSWORD_DEFAULT);
     }
+
+    public function setMobileAttr($value)
+    {
+        return encrypt_mobile($value);
+    }
+
+    public function getMobileAttr($value)
+    {
+        return $value ? decrypt_mobile($value) : '';
+    }
+
+    public function getAvatarAttr($value)
+    {
+        return $value ?: '/static/images/avatar.png';
+    }
+
+    // ========== 业务逻辑 ==========
 
     /**
      * 用户注册
@@ -29,25 +61,24 @@ class UserEntity
             return ['success' => false, 'errors' => $errors];
         }
 
-        $user = new UserModel();
-        $user->username = $data['username'];
-        $user->nickname = $data['nickname'] ?? $data['username'];
-        $user->password = $data['password'];
-        $user->mobile = $data['mobile'] ?? '';
-        $user->email = $data['email'] ?? '';
-        $user->status = 1;
-        $user->level = 1;
-        $user->points = 0;
-        $user->balance = 0;
-        $user->save();
+        $this->username = $data['username'];
+        $this->nickname = $data['nickname'] ?? $data['username'];
+        $this->password = $data['password'];
+        $this->mobile = $data['mobile'] ?? '';
+        $this->email = $data['email'] ?? '';
+        $this->status = 1;
+        $this->level = 1;
+        $this->points = 0;
+        $this->balance = 0;
+        $this->save();
 
-        $token = JwtAuth::generateUserToken($user->id);
+        $token = JwtAuth::generateUserToken($this->id);
 
         return [
             'success' => true,
             'data' => [
                 'token' => $token,
-                'user_id' => $user->id,
+                'user_id' => $this->id,
             ],
         ];
     }
@@ -58,7 +89,7 @@ class UserEntity
     public function login(array $data): array
     {
         $loginType = $data['login_type'] ?? 'username';
-        $user = $this->findUserByLoginType($loginType, $data);
+        $user = $this->findByLoginType($loginType, $data);
 
         if (!$user) {
             return ['success' => false, 'msg' => '用户不存在'];
@@ -72,7 +103,6 @@ class UserEntity
             return ['success' => false, 'msg' => '账号已被禁用'];
         }
 
-        // 更新登录信息
         $user->last_login_time = time();
         $user->last_login_ip = request()->ip();
         $user->save();
@@ -85,7 +115,7 @@ class UserEntity
             'data' => [
                 'token' => $token,
                 'user_id' => $user->id,
-                'user_info' => $this->formatUserInfo($user),
+                'user_info' => $this->formatInfo($user),
             ],
         ];
     }
@@ -95,7 +125,6 @@ class UserEntity
      */
     public function logout(string $token): bool
     {
-        // JWT 无状态，客户端删除 token 即可
         return true;
     }
 
@@ -112,11 +141,11 @@ class UserEntity
      */
     public function getInfo(int $userId): ?array
     {
-        $user = UserModel::find($userId);
+        $user = self::find($userId);
         if (!$user) {
             return null;
         }
-        return $this->formatUserInfo($user);
+        return $this->formatInfo($user);
     }
 
     /**
@@ -124,7 +153,7 @@ class UserEntity
      */
     public function updateInfo(int $userId, array $data): array
     {
-        $user = UserModel::find($userId);
+        $user = self::find($userId);
         if (!$user) {
             return ['success' => false, 'msg' => '用户不存在'];
         }
@@ -146,7 +175,7 @@ class UserEntity
 
         return [
             'success' => true,
-            'data' => $this->formatUserInfo($user),
+            'data' => $this->formatInfo($user),
         ];
     }
 
@@ -159,7 +188,7 @@ class UserEntity
             return ['success' => false, 'msg' => '新密码长度不能少于6位'];
         }
 
-        $user = UserModel::find($userId);
+        $user = self::find($userId);
         if (!$user) {
             return ['success' => false, 'msg' => '用户不存在'];
         }
@@ -179,14 +208,14 @@ class UserEntity
      */
     public function bindMobile(int $userId, string $mobile, string $code): array
     {
-        $exists = UserModel::where('mobile', encrypt_mobile($mobile))
+        $exists = self::where('mobile', encrypt_mobile($mobile))
             ->where('id', '<>', $userId)
             ->find();
         if ($exists) {
             return ['success' => false, 'msg' => '手机号已被绑定'];
         }
 
-        $user = UserModel::find($userId);
+        $user = self::find($userId);
         if (!$user) {
             return ['success' => false, 'msg' => '用户不存在'];
         }
@@ -197,9 +226,8 @@ class UserEntity
         return ['success' => true];
     }
 
-    /**
-     * 验证注册数据
-     */
+    // ========== 私有方法 ==========
+
     private function validateRegister(array $data): array
     {
         $errors = [];
@@ -212,13 +240,13 @@ class UserEntity
             $errors['password'] = '密码长度不能少于6位';
         }
 
-        $exists = UserModel::where('username', $data['username'])->find();
+        $exists = self::where('username', $data['username'])->find();
         if ($exists) {
             $errors['username'] = '用户名已存在';
         }
 
         if (!empty($data['mobile'])) {
-            $mobileExists = UserModel::where('mobile', encrypt_mobile($data['mobile']))->find();
+            $mobileExists = self::where('mobile', encrypt_mobile($data['mobile']))->find();
             if ($mobileExists) {
                 $errors['mobile'] = '手机号已被使用';
             }
@@ -227,36 +255,16 @@ class UserEntity
         return $errors;
     }
 
-    /**
-     * 根据登录类型查找用户
-     */
-    private function findUserByLoginType(string $loginType, array $data): ?UserModel
+    private function findByLoginType(string $loginType, array $data): ?self
     {
-        switch ($loginType) {
-            case 'mobile':
-                if (empty($data['mobile'])) {
-                    return null;
-                }
-                return UserModel::where('mobile', encrypt_mobile($data['mobile']))->find();
-
-            case 'email':
-                if (empty($data['email'])) {
-                    return null;
-                }
-                return UserModel::where('email', $data['email'])->find();
-
-            default:
-                if (empty($data['username'])) {
-                    return null;
-                }
-                return UserModel::where('username', $data['username'])->find();
-        }
+        return match ($loginType) {
+            'mobile' => !empty($data['mobile']) ? self::where('mobile', encrypt_mobile($data['mobile']))->find() : null,
+            'email' => !empty($data['email']) ? self::where('email', $data['email'])->find() : null,
+            default => !empty($data['username']) ? self::where('username', $data['username'])->find() : null,
+        };
     }
 
-    /**
-     * 格式化用户信息
-     */
-    private function formatUserInfo(UserModel $user): array
+    private function formatInfo(self $user): array
     {
         return [
             'id' => $user->id,

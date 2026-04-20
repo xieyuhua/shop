@@ -4,20 +4,31 @@ declare(strict_types=1);
 
 namespace app\common\entity;
 
-use app\common\model\Category as CategoryModel;
-use app\common\model\Product as ProductModel;
+use app\common\model\Category;
+use app\common\model\Product;
 
 /**
- * 后台分类实体 - 处理后台分类管理业务逻辑
+ * 后台分类实体
  */
-class AdminCategoryEntity
+class AdminCategoryEntity extends BaseEntity
 {
+    protected $table = 'category';
+
+    protected $type = [
+        'sort' => 'integer',
+        'pid' => 'integer',
+        'is_show' => 'integer',
+        'is_nav' => 'integer',
+    ];
+
+    // ========== 业务逻辑 ==========
+
     /**
      * 获取分类列表
      */
     public function getList(): array
     {
-        return CategoryModel::order('sort', 'asc')->select()->toArray();
+        return self::order('sort', 'asc')->select()->toArray();
     }
 
     /**
@@ -25,15 +36,15 @@ class AdminCategoryEntity
      */
     public function getTree(): array
     {
-        return CategoryModel::getTree();
+        return Category::getTree();
     }
 
     /**
-     * 获取分类选项（用于下拉选择）
+     * 获取分类选项
      */
     public function getOptions(): array
     {
-        return CategoryModel::getOptions();
+        return Category::getOptions();
     }
 
     /**
@@ -41,7 +52,7 @@ class AdminCategoryEntity
      */
     public function getDetail(int $id): ?array
     {
-        $category = CategoryModel::find($id);
+        $category = self::find($id);
         return $category ? $category->toArray() : null;
     }
 
@@ -54,7 +65,7 @@ class AdminCategoryEntity
             return ['success' => false, 'msg' => '请输入分类名称'];
         }
 
-        $category = new CategoryModel();
+        $category = new self();
         $category->pid = $data['pid'] ?? 0;
         $category->name = $data['name'];
         $category->icon = $data['icon'] ?? '';
@@ -76,7 +87,7 @@ class AdminCategoryEntity
             return ['success' => false, 'msg' => '分类ID不能为空'];
         }
 
-        $category = CategoryModel::find($data['id']);
+        $category = self::find($data['id']);
         if (!$category) {
             return ['success' => false, 'msg' => '分类不存在'];
         }
@@ -97,19 +108,17 @@ class AdminCategoryEntity
      */
     public function delete(int $id): array
     {
-        $category = CategoryModel::find($id);
+        $category = self::find($id);
         if (!$category) {
             return ['success' => false, 'msg' => '分类不存在'];
         }
 
-        // 检查是否有子分类
-        $hasChildren = CategoryModel::where('pid', $id)->count();
+        $hasChildren = self::where('pid', $id)->count();
         if ($hasChildren > 0) {
             return ['success' => false, 'msg' => '请先删除子分类'];
         }
 
-        // 检查是否有商品
-        $hasProducts = ProductModel::where('category_id', $id)->count();
+        $hasProducts = Product::where('category_id', $id)->count();
         if ($hasProducts > 0) {
             return ['success' => false, 'msg' => '该分类下有商品，无法删除'];
         }
