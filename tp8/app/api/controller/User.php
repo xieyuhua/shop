@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace app\api\controller;
 
-use think\facade\Db;
+use app\model\admin\UserModel;
 
 class User extends ApiController
 {
@@ -13,18 +13,14 @@ class User extends ApiController
         $limit = $this->request->param('limit', 15);
         $keyword = $this->request->param('keyword', '');
 
-        $where = [];
+        $query = UserModel::order('id', 'desc');
+        
         if ($keyword) {
-            $where[] = ['username|mobile|email', 'like', "%{$keyword}%"];
+            $query->where('username|mobile|email|nickname', 'like', "%{$keyword}%");
         }
 
-        $list = Db::name('user')
-            ->where($where)
-            ->order('id', 'desc')
-            ->page($page, $limit)
-            ->select();
-
-        $total = Db::name('user')->where($where)->count();
+        $list = $query->page($page, $limit)->select();
+        $total = $query->count();
 
         return $this->success([
             'list' => $list,
@@ -42,16 +38,14 @@ class User extends ApiController
             return $this->error('手机号和密码不能为空');
         }
 
-        if (Db::name('user')->where('mobile', $data['mobile'])->find()) {
+        if (UserModel::where('mobile', $data['mobile'])->find()) {
             return $this->error('手机号已存在');
         }
 
-        $data['password'] = password_hash($data['password'], PASSWORD_DEFAULT);
-        $data['create_time'] = date('Y-m-d H:i:s');
-
-        $id = Db::name('user')->insertGetId($data);
+        $user = new UserModel();
+        $user->save($data);
         
-        return $this->success(['id' => $id], '添加成功');
+        return $this->success(['id' => $user->id], '添加成功');
     }
 
     public function update()
@@ -59,19 +53,19 @@ class User extends ApiController
         $id = $this->request->post('id');
         $data = $this->request->post();
 
-        if (!empty($data['password'])) {
-            $data['password'] = password_hash($data['password'], PASSWORD_DEFAULT);
-        } else {
+        if (isset($data['password']) && empty($data['password'])) {
             unset($data['password']);
         }
+        unset($data['id']);
 
-        if (isset($data['id'])) {
-            unset($data['id']);
+        $user = UserModel::find($id);
+        if (!$user) {
+            return $this->error('用户不存在');
         }
 
-        $result = Db::name('user')->where('id', $id)->update($data);
+        $user->save($data);
         
-        return $result !== false ? $this->success(null, '更新成功') : $this->error('更新失败');
+        return $this->success(null, '更新成功');
     }
 
     public function delete()
@@ -82,8 +76,13 @@ class User extends ApiController
             return $this->error('参数错误');
         }
         
-        $result = Db::name('user')->delete($id);
+        $user = UserModel::find($id);
+        if (!$user) {
+            return $this->error('用户不存在');
+        }
+
+        $user->delete();
         
-        return $result ? $this->success(null, '删除成功') : $this->error('删除失败');
+        return $this->success(null, '删除成功');
     }
 }

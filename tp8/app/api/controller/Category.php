@@ -3,13 +3,14 @@ declare(strict_types=1);
 
 namespace app\api\controller;
 
-use think\facade\Db;
+use app\model\admin\CategoryModel;
+use app\model\admin\ProductModel;
 
 class Category extends ApiController
 {
     public function index()
     {
-        $list = Db::name('category')->order('sort', 'asc')->select();
+        $list = CategoryModel::order('sort', 'asc')->select();
         
         return $this->success($list);
     }
@@ -22,12 +23,12 @@ class Category extends ApiController
             return $this->error('分类名称不能为空');
         }
 
-        $data['slug'] = $data['slug'] ?: str_slug($data['name']);
-        $data['create_time'] = date('Y-m-d H:i:s');
+        $data['slug'] = $data['slug'] ?? str_slug($data['name']);
 
-        $id = Db::name('category')->insertGetId($data);
+        $category = new CategoryModel();
+        $category->save($data);
         
-        return $this->success(['id' => $id], '添加成功');
+        return $this->success(['id' => $category->id], '添加成功');
     }
 
     public function update()
@@ -38,30 +39,37 @@ class Category extends ApiController
         if (empty($data['slug'])) {
             $data['slug'] = str_slug($data['name']);
         }
-        
-        if (isset($data['id'])) {
-            unset($data['id']);
+        unset($data['id']);
+
+        $category = CategoryModel::find($id);
+        if (!$category) {
+            return $this->error('分类不存在');
         }
 
-        $result = Db::name('category')->where('id', $id)->update($data);
+        $category->save($data);
         
-        return $result !== false ? $this->success(null, '更新成功') : $this->error('更新失败');
+        return $this->success(null, '更新成功');
     }
 
     public function delete()
     {
         $id = $this->request->param('id');
         
-        if (Db::name('category')->where('pid', $id)->count() > 0) {
+        if (CategoryModel::where('pid', $id)->count() > 0) {
             return $this->error('请先删除子分类');
         }
 
-        if (Db::name('product')->where('category_id', $id)->count() > 0) {
+        if (ProductModel::where('category_id', $id)->count() > 0) {
             return $this->error('该分类下有商品，无法删除');
         }
 
-        $result = Db::name('category')->delete($id);
+        $category = CategoryModel::find($id);
+        if (!$category) {
+            return $this->error('分类不存在');
+        }
+
+        $category->delete();
         
-        return $result ? $this->success(null, '删除成功') : $this->error('删除失败');
+        return $this->success(null, '删除成功');
     }
 }

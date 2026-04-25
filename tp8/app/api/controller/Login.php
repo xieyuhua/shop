@@ -3,8 +3,8 @@ declare(strict_types=1);
 
 namespace app\api\controller;
 
-use think\facade\Db;
-use think\Model;
+use app\model\admin\AdminModel;
+use think\exception\ValidateException;
 
 class Login extends ApiController
 {
@@ -17,35 +17,30 @@ class Login extends ApiController
             return $this->error('用户名和密码不能为空');
         }
 
-        $admin = Db::name('admin')->where('username', $username)->find();
+        $admin = AdminModel::where('username', $username)->find();
         
         if (!$admin) {
             return $this->error('用户不存在');
         }
 
-        if ($admin['status'] == 0) {
+        if (!$admin->isActive()) {
             return $this->error('账户已被禁用');
         }
 
-        if (!password_verify($password, $admin['password'])) {
+        if (!$admin->checkPassword($password)) {
             return $this->error('密码错误');
         }
 
-        Db::name('admin')->where('id', $admin['id'])->update([
-            'login_ip' => $this->request->ip(),
-            'login_time' => date('Y-m-d H:i:s'),
-        ]);
+        $admin->login_ip = $this->request->ip();
+        $admin->login_time = date('Y-m-d H:i:s');
+        $admin->save();
 
         $secret = env('JWT_SECRET', 'mall_jwt_secret_key_2024');
         $expire = env('JWT_EXPIRE', 7200);
 
         $payload = [
-            'sub' => $admin['id'],
-            'data' => [
-                'id' => $admin['id'],
-                'username' => $admin['username'],
-                'nickname' => $admin['nickname'],
-            ],
+            'sub' => $admin->id,
+            'data' => $admin->toSafe(),
             'iat' => time(),
             'exp' => time() + $expire,
         ];
@@ -54,7 +49,7 @@ class Login extends ApiController
 
         return $this->success([
             'token' => $token,
-            'user' => $payload['data'],
+            'user' => $admin->toSafe(),
             'expire' => $expire,
         ]);
     }

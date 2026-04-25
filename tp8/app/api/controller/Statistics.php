@@ -3,7 +3,9 @@ declare(strict_types=1);
 
 namespace app\api\controller;
 
-use think\facade\Db;
+use app\model\admin\OrderModel;
+use app\model\admin\UserModel;
+use app\model\admin\ProductModel;
 
 class Statistics extends ApiController
 {
@@ -34,17 +36,17 @@ class Statistics extends ApiController
         }
         
         $stats = [
-            'order_count' => Db::name('order')->where($orderWhere)->count(),
-            'order_amount' => Db::name('order')->where($orderWhere)->sum('pay_amount') ?: 0,
-            'user_count' => Db::name('user')->where($userWhere)->count(),
-            'product_count' => Db::name('product')->where('status', 1)->count(),
-            'pending_payment' => Db::name('order')->where('status', 0)->count(),
-            'pending_ship' => Db::name('order')->where('status', 1)->count(),
-            'pending_receive' => Db::name('order')->where('status', 2)->count(),
-            'today_order' => Db::name('order')->where('create_time', 'like', "{$today}%")->count(),
-            'today_sales' => Db::name('order')->where('create_time', 'like', "{$today}%")->sum('pay_amount') ?: 0,
-            'today_user' => Db::name('user')->where('create_time', 'like', "{$today}%")->count(),
-            'today_product' => Db::name('product')->where('status', 1)->count(),
+            'order_count' => OrderModel::where($orderWhere)->count(),
+            'order_amount' => OrderModel::where($orderWhere)->sum('pay_amount') ?: 0,
+            'user_count' => UserModel::where($userWhere)->count(),
+            'product_count' => ProductModel::where('status', 1)->count(),
+            'pending_payment' => OrderModel::where('status', 0)->count(),
+            'pending_ship' => OrderModel::where('status', 1)->count(),
+            'pending_receive' => OrderModel::where('status', 2)->count(),
+            'today_order' => OrderModel::where('create_time', 'like', "{$today}%")->count(),
+            'today_sales' => OrderModel::where('create_time', 'like', "{$today}%")->sum('pay_amount') ?: 0,
+            'today_user' => UserModel::where('create_time', 'like', "{$today}%")->count(),
+            'today_product' => ProductModel::where('status', 1)->count(),
         ];
         
         return $this->success($stats);
@@ -55,8 +57,7 @@ class Statistics extends ApiController
         $days = $this->request->param('days', 7);
         $startDate = date('Y-m-d', strtotime("-{$days} days"));
         
-        $list = Db::name('order')
-            ->where('status', 'in', '0,1,2,3')
+        $list = OrderModel::where('status', 'in', '0,1,2,3')
             ->where('create_time', '>=', $startDate)
             ->field("from_unixtime(unix_timestamp(create_time), '%Y-%m-%d') as date, count(*) as count, sum(pay_amount) as amount")
             ->group('date')

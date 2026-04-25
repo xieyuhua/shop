@@ -3,7 +3,8 @@ declare(strict_types=1);
 
 namespace app\api\controller;
 
-use think\facade\Db;
+use app\model\admin\ProductModel;
+use app\model\admin\CategoryModel;
 
 class Product extends ApiController
 {
@@ -15,26 +16,22 @@ class Product extends ApiController
         $keyword = $this->request->param('keyword', '');
         $status = $this->request->param('status', '');
 
-        $where = [];
+        $query = ProductModel::order('id', 'desc');
+        
         if ($category_id > 0) {
-            $where[] = ['category_id', '=', $category_id];
+            $query->where('category_id', $category_id);
         }
         if ($keyword) {
-            $where[] = ['name|slug', 'like', "%{$keyword}%"];
+            $query->where('name|slug', 'like', "%{$keyword}%");
         }
         if ($status !== '') {
-            $where[] = ['status', '=', $status];
+            $query->where('status', $status);
         }
 
-        $list = Db::name('product')
-            ->where($where)
-            ->order('id', 'desc')
-            ->page($page, $limit)
-            ->select();
+        $list = $query->page($page, $limit)->select();
+        $total = $query->count();
 
-        $total = Db::name('product')->where($where)->count();
-
-        $categories = Db::name('category')->where('status', 1)->order('sort', 'asc')->select();
+        $categories = CategoryModel::where('status', 1)->order('sort', 'asc')->select();
 
         return $this->success([
             'list' => $list,
@@ -51,12 +48,12 @@ class Product extends ApiController
             return $this->error('商品名称和分类不能为空');
         }
 
-        $data['slug'] = $data['slug'] ?: str_slug($data['name']);
-        $data['create_time'] = date('Y-m-d H:i:s');
+        $data['slug'] = $data['slug'] ?? str_slug($data['name']);
 
-        $id = Db::name('product')->insertGetId($data);
+        $product = new ProductModel();
+        $product->save($data);
         
-        return $this->success(['id' => $id], '添加成功');
+        return $this->success(['id' => $product->id], '添加成功');
     }
 
     public function update()
@@ -67,14 +64,16 @@ class Product extends ApiController
         if (empty($data['slug'])) {
             $data['slug'] = str_slug($data['name']);
         }
-        
-        if (isset($data['id'])) {
-            unset($data['id']);
+        unset($data['id']);
+
+        $product = ProductModel::find($id);
+        if (!$product) {
+            return $this->error('商品不存在');
         }
 
-        $result = Db::name('product')->where('id', $id)->update($data);
+        $product->save($data);
         
-        return $result !== false ? $this->success(null, '更新成功') : $this->error('更新失败');
+        return $this->success(null, '更新成功');
     }
 
     public function delete()
@@ -85,8 +84,13 @@ class Product extends ApiController
             return $this->error('参数错误');
         }
         
-        $result = Db::name('product')->delete($id);
+        $product = ProductModel::find($id);
+        if (!$product) {
+            return $this->error('商品不存在');
+        }
+
+        $product->delete();
         
-        return $result ? $this->success(null, '删除成功') : $this->error('删除失败');
+        return $this->success(null, '删除成功');
     }
 }
