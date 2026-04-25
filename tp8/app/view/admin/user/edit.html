@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{$title}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/admin/css/admin.css">
+</head>
+<body>
+    <div class="container-fluid mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4>{$title}</h4>
+            <a href="/admin/user/index" class="btn btn-secondary">返回</a>
+        </div>
+        
+        <div class="card">
+            <div class="card-body">
+                <form method="post" action="/admin/user/update">
+                    <input type="hidden" name="id" value="{$info.id}">
+                    <div class="form-group row">
+                        <label class="col-md-2 col-form-label">手机号</label>
+                        <div class="col-md-6">
+                            <input type="text" name="mobile" class="form-control" value="{$info.mobile}" readonly>
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <label class="col-md-2 col-form-label">新密码</label>
+                        <div class="col-md-6">
+                            <input type="password" name="password" class="form-control" placeholder="留空表示不修改">
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <label class="col-md-2 col-form-label">昵称</label>
+                        <div class="col-md-6">
+                            <input type="text" name="nickname" class="form-control" value="{$info.nickname}">
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <label class="col-md-2 col-form-label">邮箱</label>
+                        <div class="col-md-6">
+                            <input type="email" name="email" class="form-control" value="{$info.email}">
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <label class="col-md-2 col-form-label">余额</label>
+                        <div class="col-md-4">
+                            <input type="number" name="balance" class="form-control" value="{$info.balance}">
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <label class="col-md-2 col-form-label">积分</label>
+                        <div class="col-md-4">
+                            <input type="number" name="points" class="form-control" value="{$info.points}">
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <label class="col-md-2 col-form-label">状态</label>
+                        <div class="col-md-6">
+                            <select name="status" class="form-control">
+                                <option value="1" {eq name="info.status" value="1"}selected{/eq}>正常</option>
+                                <option value="0" {eq name="info.status" value="0"}selected{/eq}>禁用</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <div class="col-md-6 offset-md-2">
+                            <button type="submit" class="btn btn-primary">保存</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

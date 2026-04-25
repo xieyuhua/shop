@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{$title}</title>
+    <link rel="stylesheet" href="/static/admin/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/admin/css/admin.css">
+</head>
+<body>
+    <div class="container-fluid mt-4">
+        <h4 class="mb-4">{$title}</h4>
+        
+        <div class="row">
+            <div class="col-md-3">
+                <div class="card text-white bg-primary mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">今日订单</h5>
+                        <h2 class="mb-0">{$stats.today_order|default=0}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-white bg-success mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">今日销售额</h5>
+                        <h2 class="mb-0">￥{$stats.today_sales|default=0}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-white bg-info mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">新增会员</h5>
+                        <h2 class="mb-0">{$stats.today_user|default=0}</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-white bg-warning mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">在售商品</h5>
+                        <h2 class="mb-0">{$stats.today_product|default=0}</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">快捷操作</div>
+                    <div class="card-body">
+                        <a href="/admin/product/add" class="btn btn-primary">添加商品</a>
+                        <a href="/admin/order/index?status=0" class="btn btn-warning">待处理订单</a>
+                        <a href="/admin/user/index" class="btn btn-info">会员管理</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/admin/js/jquery.min.js"></script>
+    <script src="/static/admin/js/bootstrap.min.js"></script>
+</body>
+</html>

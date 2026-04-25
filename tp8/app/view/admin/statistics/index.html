@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{$title}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/static/admin/css/admin.css">
+</head>
+<body>
+    <div class="container-fluid mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4>{$title}</h4>
+            <div>
+                <a href="/admin/statistics/index?type=today" class="btn btn-sm {eq name="type" value="today"}btn-primary{else/}btn-outline-primary{/eq}">今日</a>
+                <a href="/admin/statistics/index?type=7days" class="btn btn-sm {eq name="type" value="7days"}btn-primary{else/}btn-outline-primary{/eq}">7天</a>
+                <a href="/admin/statistics/index?type=30days" class="btn btn-sm {eq name="type" value="30days"}btn-primary{else/}btn-outline-primary{/eq}">30天</a>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-3">
+                <div class="card bg-primary text-white mb-3">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h6 class="mb-0">订单数</h6>
+                                <h3 class="mb-0">{$stats.order_count|default=0}</h3>
+                            </div>
+                            <i class="fa fa-shopping-cart fa-2x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-success text-white mb-3">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h6 class="mb-0">销售额</h6>
+                                <h3 class="mb-0">￥{$stats.order_amount|default=0}</h3>
+                            </div>
+                            <i class="fa fa-money fa-2x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-info text-white mb-3">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h6 class="mb-0">新增会员</h6>
+                                <h3 class="mb-0">{$stats.user_count|default=0}</h3>
+                            </div>
+                            <i class="fa fa-users fa-2x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-warning text-white mb-3">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <h6 class="mb-0">在售商品</h6>
+                                <h3 class="mb-0">{$stats.product_count|default=0}</h3>
+                            </div>
+                            <i class="fa fa-cubes fa-2x opacity-50"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mt-3">
+            <div class="col-md-6">
+                <div class="card mb-3">
+                    <div class="card-header">待处理订单</div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col">
+                                <h4 class="text-warning">{$stats.pending_payment|default=0}</h4>
+                                <small>待付款</small>
+                            </div>
+                            <div class="col">
+                                <h4 class="text-info">{$stats.pending_ship|default=0}</h4>
+                                <small>待发货</small>
+                            </div>
+                            <div class="col">
+                                <h4 class="text-primary">{$stats.pending_receive|default=0}</h4>
+                                <small>待收货</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card mb-3">
+                    <div class="card-header">销售趋势</div>
+                    <div class="card-body">
+                        <canvas id="salesChart" height="150"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script>
+    $(function() {
+        $.get('/admin/statistics/chart', {days: 7}, function(res) {
+            if (res.code === 200) {
+                var labels = res.data.map(function(item) { return item.date; });
+                var amounts = res.data.map(function(item) { return item.amount || 0; });
+                new Chart(document.getElementById('salesChart'), {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: '销售额',
+                            data: amounts,
+                            borderColor: '#28a745',
+                            tension: 0.3,
+                            fill: false
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { display: false } }
+                    }
+                });
+            }
+        });
+    });
+    </script>
+</body>
+</html>

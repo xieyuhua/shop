@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{$title}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/admin/css/admin.css">
+</head>
+<body>
+    <div class="container-fluid mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4>{$title}</h4>
+            <a href="/admin/order/index" class="btn btn-secondary">返回</a>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card mb-3">
+                    <div class="card-header">订单信息</div>
+                    <div class="card-body">
+                        <table class="table table-bordered mb-0">
+                            <tr>
+                                <th width="120">订单编号</th>
+                                <td>{$order.order_no}</td>
+                            </tr>
+                            <tr>
+                                <th>订单状态</th>
+                                <td>
+                                    {switch name="order.status"}
+                                    {case value="0"}<span class="badge badge-warning">待付款</span>{/case}
+                                    {case value="1"}<span class="badge badge-info">待发货</span>{/case}
+                                    {case value="2"}<span class="badge badge-primary">待收货</span>{/case}
+                                    {case value="3"}<span class="badge badge-success">已完成</span>{/case}
+                                    {case value="4"}<span class="badge badge-secondary">已取消</span>{/case}
+                                    {case value="5"}<span class="badge badge-danger">已退款</span>{/case}
+                                    {/switch}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>下单时间</th>
+                                <td>{$order.create_time}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="card mb-3">
+                    <div class="card-header">收货信息</div>
+                    <div class="card-body">
+                        <table class="table table-bordered mb-0">
+                            <tr>
+                                <th width="120">收货人</th>
+                                <td>{$order.receiver_name}</td>
+                            </tr>
+                            <tr>
+                                <th>联系电话</th>
+                                <td>{$order.receiver_mobile}</td>
+                            </tr>
+                            <tr>
+                                <th>收货地址</th>
+                                <td>{$order.receiver_province}{$order.receiver_city}{$order.receiver_district}{$order.receiver_address}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">商品信息</div>
+                    <div class="card-body">
+                        <table class="table mb-0">
+                            <thead>
+                                <tr>
+                                    <th>商品</th>
+                                    <th>规格</th>
+                                    <th>单价</th>
+                                    <th>数量</th>
+                                    <th>小计</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {volist name="items" id="item"}
+                                <tr>
+                                    <td>{$item.product_name}</td>
+                                    <td>{$item.specs|default='-'}</td>
+                                    <td>￥{$item.price}</td>
+                                    <td>{$item.quantity}</td>
+                                    <td>￥{$item.total_price}</td>
+                                </tr>
+                                {/volist}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card mb-3">
+                    <div class="card-header">金额信息</div>
+                    <div class="card-body">
+                        <table class="table mb-0">
+                            <tr><th>商品金额</th><td class="text-right">￥{$order.total_amount}</td></tr>
+                            <tr><th>优惠金额</th><td class="text-right">-￥{$order.discount_amount}</td></tr>
+                            <tr><th>运费</th><td class="text-right">￥{$order.freight_amount}</td></tr>
+                            <tr><th>实付金额</th><td class="text-right text-danger">￥{$order.pay_amount}</td></tr>
+                        </table>
+                    </div>
+                </div>
+                
+                {eq name="order.status" value="1"}
+                <div class="card">
+                    <div class="card-header">操作</div>
+                    <div class="card-body">
+                        <button type="button" class="btn btn-primary btn-block" onclick="shipOrder({$order.id})">确认发货</button>
+                    </div>
+                </div>
+                {/eq}
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    function shipOrder(id) {
+        var company = prompt('请输入快递公司:');
+        if (!company) return;
+        var no = prompt('请输入快递单号:');
+        if (!no) return;
+        $.post('/admin/order/ship', {id: id, express_company: company, express_no: no}, function(res) {
+            if (res.code === 200) {
+                location.reload();
+            } else {
+                alert(res.msg);
+            }
+        });
+    }
+    </script>
+</body>
+</html>

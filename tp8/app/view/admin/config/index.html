@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{$title}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/admin/css/admin.css">
+</head>
+<body>
+    <div class="container-fluid mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4>{$title}</h4>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-3">
+                <div class="list-group">
+                    <a href="/admin/config/index?group=basic" class="list-group-item list-group-item-action {eq name="group" value="basic"}active{/eq}">基础配置</a>
+                    <a href="/admin/config/index?group=shop" class="list-group-item list-group-item-action {eq name="group" value="shop"}active{/eq}">商城配置</a>
+                    <a href="/admin/config/index?group=payment" class="list-group-item list-group-item-action {eq name="group" value="payment"}active{/eq}">支付配置</a>
+                    <a href="/admin/config/index?group=sms" class="list-group-item list-group-item-action {eq name="group" value="sms"}active{/eq}">短信配置</a>
+                </div>
+            </div>
+            <div class="col-md-9">
+                <div class="card">
+                    <div class="card-body">
+                        <form method="post" action="/admin/config/save">
+                            {volist name="list" id="item"}
+                            <div class="form-group row">
+                                <label class="col-md-3 col-form-label">{$item.description|default=$item.name}</label>
+                                <div class="col-md-6">
+                                    <input type="text" name="{$item.name}" class="form-control" value="{$item.value}">
+                                </div>
+                            </div>
+                            {/volist}
+                            <div class="form-group row">
+                                <div class="col-md-6 offset-md-3">
+                                    <button type="submit" class="btn btn-primary">保存配置</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

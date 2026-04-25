@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{$title}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/static/admin/css/admin.css">
+</head>
+<body>
+    <div class="container-fluid mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4>{$title}</h4>
+            <a href="/admin/category/add" class="btn btn-primary"><i class="fa fa-plus"></i> 添加分类</a>
+        </div>
+        
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table mb-0">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>分类名称</th>
+                            <th>别名</th>
+                            <th>排序</th>
+                            <th>状态</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {volist name="list" id="item"}
+                        <tr>
+                            <td>{$item.id}</td>
+                            <td>{:str_repeat('└─ ', $item.level)}{$item.name}</td>
+                            <td>{$item.slug}</td>
+                            <td>{$item.sort}</td>
+                            <td>
+                                {eq name="item.status" value="1"}
+                                <span class="badge badge-success">显示</span>
+                                {else/}
+                                <span class="badge badge-secondary">隐藏</span>
+                                {/eq}
+                            </td>
+                            <td>
+                                <a href="/admin/category/edit?id={$item.id}" class="btn btn-sm btn-primary">编辑</a>
+                                <a href="javascript:;" class="btn btn-sm btn-danger" onclick="deleteCategory({$item.id})">删除</a>
+                            </td>
+                        </tr>
+                        {/volist}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    function deleteCategory(id) {
+        if (confirm('确定要删除该分类吗？')) {
+            $.post('/admin/category/delete', {id: id}, function(res) {
+                if (res.code === 200) location.reload();
+                else alert(res.msg);
+            });
+        }
+    }
+    </script>
+</body>
+</html>

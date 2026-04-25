@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{$title}</title>
+    <link rel="stylesheet" href="/static/admin/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/admin/css/admin.css">
+</head>
+<body>
+    <div class="container-fluid mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4>{$title}</h4>
+        </div>
+        
+        <div class="card">
+            <div class="card-body">
+                <form method="get" class="form-inline">
+                    <input type="text" name="keyword" class="form-control mr-2" placeholder="搜索订单...">
+                    <select name="status" class="form-control mr-2">
+                        <option value="">全部状态</option>
+                        {volist name="statusList" id="st" key="key"}
+                        <option value="{$key}">{$st}</option>
+                        {/volist}
+                    </select>
+                    <button type="submit" class="btn btn-primary">搜索</button>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>订单号</th>
+                            <th>收货人</th>
+                            <th>联系电话</th>
+                            <th>订单金额</th>
+                            <th>实付金额</th>
+                            <th>状态</th>
+                            <th>下单时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {volist name="list.items()" id="item"}
+                        <tr>
+                            <td>{$item.order_no}</td>
+                            <td>{$item.receiver_name}</td>
+                            <td>{$item.receiver_mobile}</td>
+                            <td>￥{$item.total_amount}</td>
+                            <td>￥{$item.pay_amount}</td>
+                            <td>
+                                {switch name="item.status"}
+                                {case value="0"}<span class="badge badge-warning">待付款</span>{/case}
+                                {case value="1"}<span class="badge badge-info">待发货</span>{/case}
+                                {case value="2"}<span class="badge badge-primary">待收货</span>{/case}
+                                {case value="3"}<span class="badge badge-success">已完成</span>{/case}
+                                {case value="4"}<span class="badge badge-secondary">已取消</span>{/case}
+                                {case value="5"}<span class="badge badge-danger">已退款</span>{/case}
+                                {/switch}
+                            </td>
+                            <td>{$item.create_time}</td>
+                            <td>
+                                <a href="/admin/order/detail?id={$item.id}" class="btn btn-sm btn-primary">详情</a>
+                            </td>
+                        </tr>
+                        {/volist}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div class="mt-3">{$list|raw}</div>
+    </div>
+    
+    <script src="/static/admin/js/jquery.min.js"></script>
+    <script src="/static/admin/js/bootstrap.min.js"></script>
+</body>
+</html>
