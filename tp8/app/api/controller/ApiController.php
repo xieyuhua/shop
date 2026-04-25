@@ -3,11 +3,9 @@ declare(strict_types=1);
 
 namespace app\api\controller;
 
-use think\annotation\route\Group;
-use think\annotation\route\Route;
 use think\App;
+use think\exception\ValidateException;
 
-#[Group('api')]
 abstract class ApiController
 {
     protected $request;
@@ -23,12 +21,29 @@ abstract class ApiController
         $this->adminInfo = $this->request->adminInfo ?? [];
     }
 
-    protected function success($data = null, $msg = 'success')
+    protected function validate(array $data, string $validate, string $scene = ''): bool
+    {
+        try {
+            $v = new $validate();
+            if ($scene) {
+                $v->scene($scene);
+            }
+            
+            if (!$v->check($data)) {
+                return $this->error($v->getError());
+            }
+            return true;
+        } catch (ValidateException $e) {
+            return $this->error($e->getMessage());
+        }
+    }
+
+    protected function success($data = null, $msg = 'success'): \think\Response
     {
         return json(['code' => 200, 'msg' => $msg, 'data' => $data]);
     }
 
-    protected function error($msg = 'error', $code = 400)
+    protected function error($msg = 'error', $code = 400): \think\Response
     {
         return json(['code' => $code, 'msg' => $msg]);
     }

@@ -74,8 +74,7 @@ CREATE TABLE IF NOT EXISTS `tp_product` (
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   KEY `idx_category_id` (`category_id`),
-  KEY `idx_status` (`status`),
-  KEY `idx_create_time` (`create_time`)
+  KEY `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='商品表';
 
 -- 购物车表
@@ -89,8 +88,7 @@ CREATE TABLE IF NOT EXISTS `tp_cart` (
   `specs` VARCHAR(500) DEFAULT NULL COMMENT '规格',
   `quantity` INT NOT NULL DEFAULT 1 COMMENT '数量',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  KEY `idx_user_id` (`user_id`),
-  KEY `idx_product_id` (`product_id`)
+  KEY `idx_user_id` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='购物车表';
 
 -- 订单表
@@ -109,7 +107,7 @@ CREATE TABLE IF NOT EXISTS `tp_order` (
   `pay_amount` DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '实付金额',
   `points_amount` DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '积分抵扣',
   `freight_amount` DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '运费',
-  `pay_type` TINYINT DEFAULT NULL COMMENT '支付方式:1=微信,2=支付宝,3=余额',
+  `pay_type` TINYINT DEFAULT NULL COMMENT '支付方式',
   `pay_time` DATETIME DEFAULT NULL COMMENT '支付时间',
   `pay_no` VARCHAR(100) DEFAULT NULL COMMENT '支付流水号',
   `express_company` VARCHAR(100) DEFAULT NULL COMMENT '快递公司',
@@ -121,8 +119,7 @@ CREATE TABLE IF NOT EXISTS `tp_order` (
   `update_time` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   KEY `idx_user_id` (`user_id`),
   KEY `idx_order_no` (`order_no`),
-  KEY `idx_status` (`status`),
-  KEY `idx_create_time` (`create_time`)
+  KEY `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单表';
 
 -- 订单商品表
@@ -138,9 +135,7 @@ CREATE TABLE IF NOT EXISTS `tp_order_item` (
   `quantity` INT NOT NULL DEFAULT 1 COMMENT '数量',
   `total_price` DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '小计',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  KEY `idx_order_id` (`order_id`),
-  KEY `idx_order_no` (`order_no`),
-  KEY `idx_product_id` (`product_id`)
+  KEY `idx_order_id` (`order_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单商品表';
 
 -- 钱包记录表
@@ -153,9 +148,7 @@ CREATE TABLE IF NOT EXISTS `tp_wallet_log` (
   `after_balance` DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '变化后余额',
   `remark` VARCHAR(500) DEFAULT NULL COMMENT '备注',
   `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  KEY `idx_user_id` (`user_id`),
-  KEY `idx_type` (`type`),
-  KEY `idx_create_time` (`create_time`)
+  KEY `idx_user_id` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='钱包记录表';
 
 -- 系统配置表
@@ -171,8 +164,54 @@ CREATE TABLE IF NOT EXISTS `tp_config` (
   UNIQUE KEY `uk_name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统配置表';
 
+-- 数据字典表
+CREATE TABLE IF NOT EXISTS `tp_dict` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `group` VARCHAR(50) NOT NULL DEFAULT 'default' COMMENT '分组',
+  `value` VARCHAR(100) NOT NULL COMMENT '值',
+  `label` VARCHAR(100) NOT NULL COMMENT '标签',
+  `sort` INT NOT NULL DEFAULT 100 COMMENT '排序',
+  `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态:0=禁用,1=正常',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY `idx_group` (`group`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='数据字典表';
+
+-- 文件表
+CREATE TABLE IF NOT EXISTS `tp_file` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `group` VARCHAR(50) NOT NULL DEFAULT 'default' COMMENT '分组',
+  `filename` VARCHAR(255) NOT NULL COMMENT '文件名',
+  `filepath` VARCHAR(255) NOT NULL COMMENT '文件路径',
+  `filesize` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '文件大小',
+  `filetype` VARCHAR(50) DEFAULT NULL COMMENT '文件类型',
+  `ext` VARCHAR(20) DEFAULT NULL COMMENT '扩展名',
+  `mime` VARCHAR(100) DEFAULT NULL COMMENT 'MIME类型',
+  `use_num` INT NOT NULL DEFAULT 0 COMMENT '引用次数',
+  `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态:0=禁用,1=正常',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY `idx_group` (`group`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文件表';
+
+-- 操作日志表
+CREATE TABLE IF NOT EXISTS `tp_log` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `type` TINYINT NOT NULL DEFAULT 0 COMMENT '类型:1=登录,2=退出,3=创建,4=更新,5=删除',
+  `content` VARCHAR(500) DEFAULT NULL COMMENT '内容',
+  `admin_id` INT UNSIGNED DEFAULT NULL COMMENT '管理员ID',
+  `admin_name` VARCHAR(50) DEFAULT NULL COMMENT '管理员',
+  `ip` VARCHAR(50) DEFAULT NULL COMMENT 'IP地址',
+  `url` VARCHAR(255) DEFAULT NULL COMMENT 'URL',
+  `method` VARCHAR(10) DEFAULT NULL COMMENT '请求方法',
+  `param` TEXT DEFAULT NULL COMMENT '请求参数',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY `idx_admin_id` (`admin_id`),
+  KEY `idx_type` (`type`),
+  KEY `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='操作日志表';
+
 -- 插入超级管理员 (密码: admin123)
-INSERT INTO `tp_admin` (`username`, `password`, `nickname`, `status`) VALUES ('admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '超级管理员', 1);
+INSERT INTO `tp_admin` (`username`, `password`, `nickname`, `status`) VALUES 
+('admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '超级管理员', 1);
 
 -- 插入测试会员 (密码: 123456)
 INSERT INTO `tp_user` (`mobile`, `password`, `nickname`, `status`) VALUES 
@@ -199,10 +238,27 @@ INSERT INTO `tp_product` (`category_id`, `name`, `slug`, `price`, `original_pric
 INSERT INTO `tp_config` (`group`, `name`, `value`, `description`) VALUES 
 ('basic', 'site_name', '商城系统', '网站名称'),
 ('basic', 'site_logo', '', '网站Logo'),
-('basic', 'site_icp', '京ICP备123456789号', 'ICP备案号'),
+('basic', 'site_icp', '', 'ICP备案号'),
 ('shop', 'free_shipping_amount', '99', '满多少免运费'),
 ('shop', 'shipping_fee', '10', '运费'),
-('shop', 'points_rate', '10', '积分抵现比例(积分/元)'),
+('shop', 'points_rate', '10', '积分抵现比例'),
 ('payment', 'wechat_appid', '', '微信AppID'),
 ('payment', 'wechat_mchid', '', '微信商户号'),
 ('payment', 'alipay_appid', '', '支付宝AppID');
+
+-- 插入数据字典
+INSERT INTO `tp_dict` (`group`, `value`, `label`, `sort`, `status`) VALUES 
+('status', '1', '启用', 1, 1),
+('status', '0', '禁用', 2, 1),
+('gender', '0', '未知', 1, 1),
+('gender', '1', '男', 2, 1),
+('gender', '2', '女', 3, 1),
+('order_status', '0', '待付款', 1, 1),
+('order_status', '1', '待发货', 2, 1),
+('order_status', '2', '待收货', 3, 1),
+('order_status', '3', '已完成', 4, 1),
+('order_status', '4', '已取消', 5, 1),
+('order_status', '5', '已退款', 6, 1),
+('pay_type', '1', '微信支付', 1, 1),
+('pay_type', '2', '支付宝', 2, 1),
+('pay_type', '3', '余额支付', 3, 1);

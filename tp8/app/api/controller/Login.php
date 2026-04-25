@@ -4,18 +4,20 @@ declare(strict_types=1);
 namespace app\api\controller;
 
 use app\model\admin\AdminModel;
-use think\exception\ValidateException;
+use app\api\validate\LoginValidate;
 
 class Login extends ApiController
 {
     public function login()
     {
-        $username = $this->request->param('username');
-        $password = $this->request->param('password');
-
-        if (!$username || !$password) {
-            return $this->error('用户名和密码不能为空');
+        $data = $this->request->post();
+        
+        if (!$this->validate($data, LoginValidate::class)) {
+            return $this->error($this->getError() ?: '参数错误');
         }
+
+        $username = $data['username'];
+        $password = $data['password'];
 
         $admin = AdminModel::where('username', $username)->find();
         
@@ -62,5 +64,10 @@ class Login extends ApiController
     public function info()
     {
         return $this->success($this->adminInfo);
+    }
+    
+    private function getError(): string
+    {
+        return '';
     }
 }

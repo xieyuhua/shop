@@ -3,13 +3,11 @@ declare(strict_types=1);
 
 namespace app\service;
 
-use think\db\BaseQuery;
-use think\Paginator;
+use think\Model;
 
 abstract class Service
 {
     protected $model;
-    protected $pk = 'id';
 
     protected function getModel(string $name = '')
     {
@@ -17,54 +15,26 @@ abstract class Service
         return model($model);
     }
 
-    protected function where(array $where = []): BaseQuery
-    {
-        $query = $this->getModel();
-        foreach ($where as $condition) {
-            if (count($condition) >= 2) {
-                $field = $condition[0];
-                $op = $condition[1] ?? '=';
-                $value = $condition[2] ?? null;
-                $logic = $condition[3] ?? 'AND';
-                $query = $query->where($field, $op, $value, $logic);
-            }
-        }
-        return $query;
-    }
-
-    protected function order(string $field, string $order = 'desc'): BaseQuery
-    {
-        return $this->getModel()->order($field, $order);
-    }
-
-    protected function paginate(int $page, int $listRows, array $config = []): Paginator
-    {
-        return $this->getModel()->paginate([
-            'page' => $page,
-            'list_rows' => $listRows,
-        ]);
-    }
-
-    protected function result(mixed $data, string $msg = 'success'): array
+    protected function success($data = null, $msg = 'success'): array
     {
         return ['code' => 200, 'msg' => $msg, 'data' => $data];
     }
 
-    protected function error(string $msg = 'error'): array
+    protected function error($msg = 'error', $code = 400): array
     {
-        return ['code' => 400, 'msg' => $msg];
+        return ['code' => $code, 'msg' => $msg, 'data' => null];
     }
 
-    protected function validate(array $data, array $rules, array $message = []): bool|array
+    protected function paginate($query, int $page, int $limit): array
     {
-        try {
-            $validate = new \think\Validate($rules, $message);
-            if (!$validate->check($data)) {
-                return $this->error($validate->getError());
-            }
-            return true;
-        } catch (\Exception $e) {
-            return $this->error($e->getMessage());
-        }
+        $list = $query->page($page, $limit)->select();
+        $total = $query->count();
+        
+        return [
+            'list' => $list,
+            'total' => $total,
+            'page' => $page,
+            'limit' => $limit,
+        ];
     }
 }

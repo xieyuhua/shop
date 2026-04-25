@@ -1,10 +1,12 @@
 <?php
 use think\facade\Route;
 
+Route::post('admin/login', 'api.Login/login');
+Route::post('admin/logout', 'api.Login/logout');
+Route::get('admin/user/info', 'api.Login/info');
+
 Route::group('api', function () {
-    Route::post('admin/login', 'api.Login/login');
-    Route::post('admin/logout', 'api.Login/logout');
-    Route::get('admin/user/info', 'api.Login/info');
+    Route::get('admin/dict', 'api.Dict/index');
     
     Route::get('admin/user', 'api.User/index');
     Route::post('admin/user', 'api.User/save');
@@ -32,4 +34,8 @@ Route::group('api', function () {
     
     Route::get('admin/config', 'api.Config/index');
     Route::post('admin/config', 'api.Config/save');
+    
+    Route::post('admin/file/upload', 'api.File/upload');
+    Route::get('admin/file', 'api.File/index');
+    Route::delete('admin/file/:id', 'api.File/delete');
 })->middleware(\app\api\middleware\AuthMiddleware::class);
