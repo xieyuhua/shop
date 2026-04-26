@@ -1,29 +1,29 @@
 <?php
 
-// +----------------------------------------------------------------------
-// | 缓存设置
-// +----------------------------------------------------------------------
-
 return [
-    // 默认缓存驱动
-    'default' => 'file',
+    'default' => env('CACHE_DRIVER', 'file'),
 
-    // 缓存连接方式配置
     'stores'  => [
         'file' => [
-            // 驱动方式
             'type'       => 'File',
-            // 缓存保存目录
             'path'       => '',
-            // 缓存前缀
-            'prefix'     => '',
-            // 缓存有效期 0表示永久缓存
-            'expire'     => 0,
-            // 缓存标签前缀
+            'prefix'     => env('CACHE_PREFIX', 'tp8_'),
+            'expire'     => env('CACHE_EXPIRE', 3600),
             'tag_prefix' => 'tag:',
-            // 序列化机制 例如 ['serialize', 'unserialize']
             'serialize'  => [],
         ],
-        // 更多的缓存连接
+        
+        'redis' => [
+            'type'       => 'Redis',
+            'host'       => env('REDIS_HOST', '127.0.0.1'),
+            'port'       => env('REDIS_PORT', 6379),
+            'password'  => env('REDIS_PASSWORD', ''),
+            'select'     => env('REDIS_SELECT', 0),
+            'timeout'   => env('REDIS_TIMEOUT', 0),
+            'expire'    => env('CACHE_EXPIRE', 3600),
+            'persistent' => false,
+            'prefix'    => env('CACHE_PREFIX', 'tp8_'),
+            'serialize' => ['serialize', 'unserialize'],
+        ],
     ],
 ];

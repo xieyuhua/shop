@@ -25,7 +25,7 @@ class Cache extends Facade
 }
 
 /**
- * @method static mixed get(string $group)
+ * @method static array get(string $group)
  * @method static array getList(string $group)
  * @method static array getOptions(string $group)
  * @method static void refresh(string $group = '')
@@ -39,20 +39,47 @@ class Dict extends Facade
 }
 
 /**
- * @method static success($data = null, string $msg = 'success')
- * @method static error(string $msg = 'error', int $code = 400)
- * @method static notFound(string $msg = '资源不存在')
- * @method static unauthorized(string $msg = '未授权')
- * @method static forbidden(string $msg = '没有权限')
- * @method static validateError(string $msg = '数据验证失败')
- * @method static serverError(string $msg = '服务器错误')
- * @method static paginate(array $list, int $total, int $page, int $limit)
- * @method static tree(array $list, int $pid = 0, string $pk = 'id', string $pidKey = 'pid')
+ * @method static array login(array $data)
+ * @method static array logout()
+ * @method static array getInfo(int $adminId)
  */
-class ApiResult extends Facade
+class Auth extends Facade
 {
     protected static function getFacadeClass()
     {
-        return \app\api\ApiResponse::class;
+        return \app\service\AuthService::class;
+    }
+}
+
+/**
+ * @method static array getValue(string $name, string $default = '')
+ * @method static array getGroupConfig(string $group)
+ */
+class Config extends Facade
+{
+    protected static function getFacadeClass()
+    {
+        return \app\service\ConfigService::class;
+    }
+}
+
+/**
+ * @method static string generateOrderNo(int $userId = 0)
+ * @method static string generateUniqueId(string $prefix = '')
+ * @method static string mobileMask(string $mobile)
+ * @method static string emailMask(string $email)
+ * @method static int amount(float $amount)
+ * @method static float money(int $amount)
+ * @method static string formatBytes(int $bytes)
+ * @method static string getClientType()
+ * @method static bool isMobile()
+ * @method static bool isWechat()
+ * @method static bool isAjax()
+ */
+class Helper extends Facade
+{
+    protected static function getFacadeClass()
+    {
+        return \app\service\HelperService::class;
     }
 }

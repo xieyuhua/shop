@@ -7,42 +7,42 @@ use app\service\NotifyService;
 
 class Notify extends ApiController
 {
+    protected NotifyService $service;
+
+    public function __construct()
+    {
+        $this->service = new NotifyService();
+    }
+
     public function index()
     {
-        $page = $this->request->param('page', 1);
-        $limit = $this->request->param('limit', 15);
-        
-        $result = NotifyService::getList($this->adminId, $page, $limit);
-        
+        $page = (int) $this->param('page', 1);
+        $limit = (int) $this->param('limit', 15);
+        $result = $this->service->getList($this->adminId, $page, $limit);
         return $this->success($result);
     }
 
     public function unread()
     {
-        $count = NotifyService::getUnreadCount($this->adminId);
-        
+        $count = $this->service->getUnreadCount($this->adminId);
         return $this->success(['count' => $count]);
     }
 
     public function read()
     {
-        $id = $this->request->param('id');
-        
+        $id = (int) $this->param('id');
         if ($id) {
-            NotifyService::read($id);
+            $this->service->read($id);
         } else {
-            NotifyService::readAll($this->adminId);
+            $this->service->readAll($this->adminId);
         }
-        
         return $this->success(null, '已标记为已读');
     }
 
     public function delete()
     {
-        $id = $this->request->param('id');
-        
-        $result = NotifyService::delete($id);
-        
+        $id = (int) $this->param('id');
+        $result = $this->service->delete($id);
         return $result ? $this->success(null, '删除成功') : $this->error('删除失败');
     }
 }

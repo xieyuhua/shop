@@ -4,47 +4,73 @@ declare(strict_types=1);
 namespace app\api\controller;
 
 use think\App;
-use think\exception\ValidateException;
 
 abstract class ApiController
 {
     protected $request;
     protected $app;
-    protected $adminId = 0;
-    protected $adminInfo = [];
+    protected int $adminId = 0;
+    protected array $adminInfo = [];
 
     public function __construct(App $app)
     {
         $this->app = $app;
-        $this->request = $this->app->request;
+        $this->request = $app->request;
         $this->adminId = $this->request->adminId ?? 0;
         $this->adminInfo = $this->request->adminInfo ?? [];
     }
 
-    protected function validate(array $data, string $validate, string $scene = ''): bool
+    protected function param(string $name = '', mixed $default = null): mixed
     {
-        try {
-            $v = new $validate();
-            if ($scene) {
-                $v->scene($scene);
-            }
-            
-            if (!$v->check($data)) {
-                return $this->error($v->getError());
-            }
-            return true;
-        } catch (ValidateException $e) {
-            return $this->error($e->getMessage());
-        }
+        return $name ? ($this->request->param($name) ?? $default) : $this->request->param();
     }
 
-    protected function success($data = null, $msg = 'success'): \think\Response
+    protected function post(string $name = ''): mixed
+    {
+        return $name ? $this->request->post($name) : $this->request->post();
+    }
+
+    protected function id(int $default = 0): int
+    {
+        return (int) ($this->request->param('id') ?? $default);
+    }
+
+    protected function page(int $default = 1): int
+    {
+        return (int) ($this->request->param('page') ?? $default);
+    }
+
+    protected function limit(int $default = 15): int
+    {
+        return (int) ($this->request->param('limit') ?? $default);
+    }
+
+    protected function success(mixed $data = null, string $msg = 'success'): \think\Response
     {
         return json(['code' => 200, 'msg' => $msg, 'data' => $data]);
     }
 
-    protected function error($msg = 'error', $code = 400): \think\Response
+    protected function error(string $msg = 'error', int $code = 400): \think\Response
     {
-        return json(['code' => $code, 'msg' => $msg]);
+        return json(['code' => $code, 'msg' => $msg, 'data' => null]);
+    }
+
+    protected function result(int $code, string $msg, mixed $data = null): \think\Response
+    {
+        return json(['code' => $code, 'msg' => $msg, 'data' => $data]);
+    }
+
+    protected function parse(array $result, mixed $default = null): \think\Response
+    {
+        return $result['code'] === 200 
+            ? $this->success($result['data'] ?? $default, $result['msg']) 
+            : $this->error($result['msg'], $result['code'] ?? 400);
+    }
+
+    protected function parseList(array $result): \think\Response
+    {
+        return $result['code'] === 200 
+            ? $this->success($result['data']) 
+            : $this->error($result['msg']);
     }
 }

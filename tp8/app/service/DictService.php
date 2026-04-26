@@ -3,14 +3,14 @@ declare(strict_types=1);
 
 namespace app\service;
 
-use think\facade\Db;
-
-class DictService
+class DictService extends Service
 {
+    protected string $model = 'dict';
+
     const CACHE_KEY = 'dict:';
     const CACHE_TTL = 3600;
 
-    public static function get(string $group): array
+    public function get(string $group): array
     {
         $cacheKey = self::CACHE_KEY . $group;
         $data = cache($cacheKey);
@@ -19,7 +19,7 @@ class DictService
             return $data;
         }
 
-        $list = Db::name('dict')->where('group', $group)->where('status', 1)->order('sort', 'asc')->select();
+        $list = db($this->model)->where('group', $group)->where('status', 1)->order('sort', 'asc')->select();
         
         $items = [];
         foreach ($list as $item) {
@@ -31,34 +31,30 @@ class DictService
         return $items;
     }
 
-    public static function getList(string $group): array
+    public function getList(string $group): array
     {
-        return Db::name('dict')->where('group', $group)->where('status', 1)->order('sort', 'asc')->select();
+        return db($this->model)->where('group', $group)->where('status', 1)->order('sort', 'asc')->select()->toArray();
     }
 
-    public static function getOptions(string $group): array
+    public function getOptions(string $group): array
     {
-        $list = self::getList($group);
-        $options = [];
-        foreach ($list as $item) {
-            $options[] = ['value' => $item['value'], 'label' => $item['label']];
-        }
-        return $options;
+        $list = $this->getList($group);
+        return array_map(fn($item) => ['value' => $item['value'], 'label' => $item['label']], $list);
     }
 
-    public static function refresh(string $group = ''): void
+    public function refresh(string $group = ''): void
     {
         if ($group) {
             cache(self::CACHE_KEY . $group, null);
         } else {
-            $groups = Db::name('dict')->column('group');
+            $groups = db($this->model)->column('group');
             foreach ($groups as $g) {
                 cache(self::CACHE_KEY . $g, null);
             }
         }
     }
 
-    public static function getStatusOptions(): array
+    public function getStatusOptions(): array
     {
         return [
             ['value' => 1, 'label' => '启用'],
@@ -66,7 +62,7 @@ class DictService
         ];
     }
 
-    public static function getGenderOptions(): array
+    public function getGenderOptions(): array
     {
         return [
             ['value' => 0, 'label' => '未知'],
@@ -75,7 +71,7 @@ class DictService
         ];
     }
 
-    public static function getOrderStatusOptions(): array
+    public function getOrderStatusOptions(): array
     {
         return [
             ['value' => 0, 'label' => '待付款'],
@@ -87,7 +83,7 @@ class DictService
         ];
     }
 
-    public static function getPayTypeOptions(): array
+    public function getPayTypeOptions(): array
     {
         return [
             ['value' => 1, 'label' => '微信支付'],

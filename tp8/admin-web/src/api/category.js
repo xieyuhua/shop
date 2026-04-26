@@ -1,7 +1,15 @@
 import request from './request'
 
-export function getCategoryList() {
-  return request({ url: '/api/admin/category', method: 'GET' })
+export function getCategoryList(params) {
+  return request({ url: '/api/admin/category', method: 'GET', params })
+}
+
+export function getCategoryTree() {
+  return request({ url: '/api/admin/category/tree', method: 'GET' })
+}
+
+export function getCategoryOptions() {
+  return request({ url: '/api/admin/category/options', method: 'GET' })
 }
 
 export function createCategory(data) {

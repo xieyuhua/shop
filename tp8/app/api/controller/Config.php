@@ -3,26 +3,28 @@ declare(strict_types=1);
 
 namespace app\api\controller;
 
-use app\model\admin\ConfigModel;
+use app\service\ConfigService;
 
 class Config extends ApiController
 {
+    protected ConfigService $service;
+
+    public function __construct()
+    {
+        $this->service = new ConfigService();
+    }
+
     public function index()
     {
-        $group = $this->request->param('group', 'basic');
-        $list = ConfigModel::where('group', $group)->select();
-        
-        return $this->success($list);
+        $group = $this->param('group', 'basic');
+        $result = $this->service->index($group);
+        return $this->success($result['data'], $result['msg']);
     }
 
     public function save()
     {
-        $data = $this->request->post();
-        
-        foreach ($data as $name => $value) {
-            ConfigModel::setValue($name, $value);
-        }
-        
-        return $this->success(null, '保存成功');
+        $data = $this->post();
+        $result = $this->service->save($data);
+        return $result['code'] === 200 ? $this->success($result['data'], $result['msg']) : $this->error($result['msg']);
     }
 }
